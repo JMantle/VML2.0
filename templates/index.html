@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VML - Home</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='stylesheet.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header>
+    <div class="nav-brand">
+      <img src="{{ url_for('static', filename='VAILLogo.png') }}" class="logo-img" alt="VAIL Logo">
+      <span class="logo-text">VAIL VML</span>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="#about">About</a></li>
+        <li><a href="#media">Media</a></li>
+        <li><a href="#news">News</a></li>
+        <li><a href="#games">Games</a></li>
+        <li><a href="#teams">Teams</a></li>
+        <li><a href="#contact">Contact Us</a></li>
+        {% if session['captain'] %}
+        <li><a href="/manageTeam">Manage Team</a></li>
+        {% endif %}
+        {% if session['adminperms'] %}
+        <li><a href="/admin">Admin</a></li>
+        {% endif %}
+        {% if not session['loggedIn'] %}
+        <li><a href="/loginPage">Log in</a></li>
+        {% else %}
+        <li><a href="/logOut">Log out</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Video Section -->
+  <section id="video" class="section video-section">
+    <div class="video-box">
+      <video autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='VAILVideo.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </section>
+
+  <!-- About VML Section -->
+  <section id="about" class="section">
+    <h2>About VML</h2>
+    <p>The Vail Minor League (VML) is a competitive environment designed to showcase rising talent, fuel rivalry, and elevate the experience of tactical shooters through the world of VAIL.</p>
+  </section>
+
+  <!-- Media Section -->
+  <section id="media" class="section">
+    <h2>Media Gallery</h2>
+    <div class="gallery">
+      <div class="media-item">Image 1</div>
+      <div class="media-item">Image 2</div>
+      <div class="media-item">Image 3</div>
+    </div>
+  </section>
+
+  <!-- News Section -->
+  <section id="news" class="section">
+    <h2>Latest News</h2>
+    <div class="news-container">
+      <div class="news-card">
+        <h3>Season</h3>
+        <p>The first season of VML has officially begun. Join now and prove your skills!</p>
+      </div>
+      <div class="news-card">
+        <h3>Patch Notes 1.0</h3>
+        <p>New weapons, maps, and performance improvements in the latest update.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- UPCOMING GAMES -->
+  <section id="games" class="section">
+    <h2>Upcoming Games</h2>
+    <div class="games-container">
+      {% if games %}
+      <table class="upcoming-games-table">
+        <thead>
+          <tr>
+            <th>Home Team</th>
+            <th>Away Team</th>
+            <th>Date & Time ({{ session["abbreviatedTimezone"] }})</th>
+            <th>Home Players</th>
+            <th>Away Players</th>
+            <th>Other Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for game in games %}
+          <tr>
+            <td><a class="teamLink" href="/showTeam/{{ game['home'] }}">{{ game['home'] }}</a></td>
+            <td><a class="teamLink" href="/showTeam/{{ game['away'] }}">{{ game['away'] }}</a></td>
+            <td>{{ game['local_datetime'] }}</td>
+            <td>
+              {% if game['homeplayers'] %}
+              <ul class="player-list">
+                {% for player in game['homeplayers'].split(', ') %}
+                <li>{{ player }}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>
+              {% if game['awayplayers'] %}
+              <ul class="player-list">
+                {% for player in game['awayplayers'].split(', ') %}
+                <li>{{ player }}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              -
+              {% endif %}
+            </td>
+            <td>{{ game['other'] or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No upcoming games scheduled at the moment.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- LEADERBOAD -->
+  <section id="teams" class="section">
+    <h2>Teams Leaderboard</h2>
+    <table id="leaderboard" class="leaderboard-table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Team</th>
+          <th>Map Wins</th>
+          <th>Match Wins</th>
+          <th>Captain</th>
+          <th>Members</th>
+          <th>Points</th>
+          <th>MMR</th>
+        </tr>
+        {% for team in teams %}
+        <tr onclick="window.location=`/showTeam/{{ team['name'] }}`;" class="teamClick">
+          <td>{{ team['place'] }}</td>
+          <td>{{ team['name'] }}</td>
+          <td>{{ team['mapwins'] }}</td>
+          <td>{{ team["matchwins"] }}</td>
+          <td>{{ team['captain'] }}</td>
+          <td>
+            {% if team["members"] %}
+            <ul class="member-list">
+              {% for member in team['members'].split(', ') %}
+                <li>{{ member }}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ team['points'] }}</td>
+          <td>{{ team['mmr'] }}</td>
+        </tr>
+        {% endfor %}
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="section">
+    <h2>Contact Us</h2>
+
+    {% with message = get_flashed_messages() %}
+    {% if message %}
+
+    <h4>{{ message[0] }}</h4>
+
+    {% endif %}
+    {% endwith %}
+
+    <form class="contact-form" action="/submitMessage" method="POST" >
+      <input type="text" name="name" placeholder="Your Name" required />
+      <input type="email" name="email" placeholder="Your Email" required />
+      <textarea placeholder="Your Message" name="message" required></textarea>
+      <button type="submit">Send Message</button>
+    </form>
+  </section>
+
+  <footer>
+    <p>&copy; 2025 VAIL. All rights reserved.</p>
+  </footer>
+
+</body>
+</html>

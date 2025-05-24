@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stats['name'] if stats else 'Team Details' }} - VML</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='stylesheet.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <header>
+        <div class="nav-brand">
+            <img src="{{ url_for('static', filename='VAILLogo.png') }}" class="logo-img" alt="VAIL Logo">
+            <span class="logo-text">VAIL VML</span>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('index') }}#about">About</a></li>
+                <li><a href="{{ url_for('index') }}#media">Media</a></li>
+                <li><a href="{{ url_for('index') }}#news">News</a></li>
+                <li><a href="{{ url_for('index') }}#games">Games</a></li>
+                <li><a href="{{ url_for('index') }}#teams">Teams</a></li>
+                <li><a href="{{ url_for('index') }}#contact">Contact Us</a></li>
+                {% if session['captain'] %}
+                <li><a href="/manageTeam">Manage Team</a></li>
+                {% endif %}
+                {% if session['adminperms'] %}
+                <li><a href="/admin">Admin</a></li>
+                {% endif %}
+                {% if not session['loggedIn'] %}
+                <li><a href="/loginPage">Log in</a></li>
+                {% else %}
+                <li><a href="/logOut">Log out</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Team Stats -->
+    <main class="team-details-container">
+        {% if stats %}
+            <section id="team-header">
+                <h2>{{ stats['name'] }}</h2>
+                </section>
+
+            <section class="team-stats-grid">
+                <div class="stat-card">
+                    <h3>Rank</h3>
+                    <p>{{ stats['place'] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Map Wins</h3>
+                    <p>{{ stats['mapwins'] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Match Wins</h3>
+                    <p>{{ stats['matchwins'] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Points</h3>
+                    <p>{{ stats['points'] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>MMR</h3>
+                    <p>{{ stats['mmr'] }}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Captain</h3>
+                    <p>{{ stats['captain'] }}</p>
+                </div>
+            </section>
+
+            <section class="team-members">
+                <h2>Team Members</h2>
+                <div id="players-container">
+                    {% if stats['members'] %}
+                        {% for member in stats['members'].split(', ') %}
+                            <div class="player-card">
+                                <p>{{ member }}</p>
+                                {% if captain %}
+                                <form action="/removeFromTeam/{{ stats['id'] }}/{{ member }}" method="POST">
+                                    <button type="submit">Remove</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="player-card">
+                            <p>No members listed yet.</p>
+                        </div>
+                    {% endif %}
+                    {% if captain %}
+                    <div class="player-card">
+                        <form action="/addMember/{{ stats['id'] }}" method="POST">
+                            <input class="addMemberInput" name="name" placeholder="Username" type="text">
+                            <button type="submit">Add Member</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <!-- UPCOMING GAMES -->
+             <section class="team-games">
+              <h2>Upcoming Games</h2>
+              <div class="games-container">
+                {% if games %}
+                <table class="upcoming-games-table">
+                  <thead>
+                    <tr>
+                      <th>Home Team</th>
+                      <th>Away Team</th>
+                      <th>Date & Time ({{ session["abbreviatedTimezone"] }})</th>
+                      <th>Home Players</th>
+                      <th>Away Players</th>
+                      <th>Other Details</th>
+                      {% if captain %}
+                      <th>Assign Players</th>
+                      {% endif %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for game in games %}
+                    <tr>
+                      <td><a class="teamLink" href="/showTeam/{{ game['home'] }}">{{ game['home'] }}</a></td>
+                      <td><a class="teamLink" href="/showTeam/{{ game['away'] }}">{{ game['away'] }}</a></td>
+                      <td>{{ game['local_datetime'] }}</td>
+                      <td>
+                        {% if game['homeplayers'] %}
+                        <ul class="player-list">
+                          {% for player in game['homeplayers'].split(', ') %}
+                          <li>{{ player }}</li>
+                          {% endfor %}
+                        </ul>
+                        {% else %}
+                        -
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if game['awayplayers'] %}
+                        <ul class="player-list">
+                          {% for player in game['awayplayers'].split(', ') %}
+                          <li>{{ player }}</li>
+                          {% endfor %}
+                        </ul>
+                        {% else %}
+                        -
+                        {% endif %}
+                      </td>
+                      <td>{{ game['other'] or '-' }}</td>
+                      {% if captain %}
+                      <td>
+                        <form action="/assignPlayers/{{ game['id'] }}/{{ stats['name'] }}" method="POST">
+                            <input type="text" name="players" placeholder="player1, player2, player3...">
+                            <button type="submit">Assign Players</button>
+                        </form>
+                      </td>
+                      {% endif %}
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% else %}
+                <p>No upcoming games scheduled at the moment.</p>
+                {% endif %}
+              </div>
+            </section>
+
+            <section class="team-actions">
+                <!-- request membership -->
+                {% if not member %}
+                <h2>Join Team</h2>
+                {% if session['loggedIn'] %}
+                    <form action="/requestMembership/{{ stats['id'] }}/{{ session['username']}}" method="POST">
+                        <textarea type="text" name="message" method="POST" placeholder="Enter Message to the captain"></textarea>
+                        <button type="submit">Request Membership</button>
+                    </form>
+                {% else %}
+                    <p id="loginPleaseWriting">Please <a href="/loginPage">log in</a> to request membership.</p>
+                {% endif %}
+                {% endif%}
+
+                <!-- view membership requests-->
+                {% if captain %}
+                    <h2>Membership Requests</h2>
+                    {% if requests%}
+                        <table class="upcoming-games-table">   <!-- lazy on the css-->
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Message</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for request in requests %}
+                                <tr>
+                                    <td>{{ request.username }}</td>
+                                    <td>{{ request.message }}</td>
+                                    <td>
+                                        <form action="/acceptRequest/{{ request.id }}" method="POST">
+                                            <button type="submit">Accept</button>
+                                        </form>
+                                        <form action="/declineRequest/{{ request.id }}" method="POST">
+                                            <button type="submit">Decline</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>You have no membership requests</p>
+                    {% endif %}
+                {% endif %}
+
+            </section>
+
+        {% else %}
+            <p>Team not found.</p>
+        {% endif %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 VAIL. All rights reserved.</p>
+    </footer>
+
+</body>
+</html>

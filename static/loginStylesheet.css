@@ -1,0 +1,107 @@
+/* loginStylesheet.css */
+
+/* Reset & Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Orbitron', sans-serif;
+  }
+  
+  body {
+    background-color: #000000;
+    color: #ffffff;
+    line-height: 1.6;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  
+  /* Container */
+  #container {
+    background-color: #1a1a1a;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+  }
+  
+  h1 {
+    font-size: 32px;
+    margin-bottom: 30px;
+  }
+  
+  /* Input Box */
+  .inputBox {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .inputBox label {
+    text-align: left;
+    font-weight: bold;
+  }
+  
+  .inputBox input[type="text"],
+  .inputBox input[type="password"] {
+    padding: 10px;
+    background-color: #111;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+    border-radius: 5px;
+  }
+  
+  /* Error Message */
+  p {
+    color: #bdbdbd;
+    margin-top: 10px;
+  }
+  
+  /* Submit Button */
+  #submitButton {
+    padding: 10px 20px;
+    border: none;
+    background-color: #ffffff;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+    border-radius: 5px;
+  }
+  
+  #submitButton:hover {
+    box-shadow: 0 0 10px #ffffff;
+  }
+  
+  /* Home Button */
+  #homeButton {
+    margin-top: 20px;
+    padding: 8px 15px;
+    border: none;
+    background-color: #444;
+    color: #ffffff;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+    border-radius: 5px;
+  }
+  
+  #homeButton:hover {
+    box-shadow: 0 0 10px #ffffff;
+  }
+  
+  /* Link */
+  a {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+  }
+  
+  a:hover {
+    text-shadow: 0 0 5px #ffffff;
+  }

@@ -1,0 +1,22 @@
+# This is gpt generated, I don't know what needs to be ignored and what does not
+
+# Ignore Python compiled files
+__pycache__/
+*.pyc
+
+# Ignore database files
+*.db
+
+# Ignore virtual environment
+venv/
+
+# Ignore environment variables
+.env
+instance/
+
+# Ignore IDE and editor-specific files
+.vscode/
+.idea/
+
+# Ignore pipenv lock file
+Pipfile.lock
