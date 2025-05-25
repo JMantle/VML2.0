@@ -4,17 +4,53 @@ import sqlite3
 from datetime import datetime
 import pytz
 from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
+
+
+# flask app
 app = Flask(__name__)
 app.secret_key = "secretKey"   ## ENTER SECRET KEY HERE
 
-#hi
 
-# subroutine to get database connection and format
+
+# sheets setup
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("keys/key.json", scope)
+client = gspread.authorize(creds)
+
+# open sheet
+sheet = client.open_by_key("1J1Ay6lxrv0B-IBOLBgZF70dSyywNey3IOQboO1tn25Q").sheet1
+
+# sort teams by mmr on sheet
+def sortTeams():
+    # get teams table from sheet
+    data = sheet.get_all_values()
+    # sort by mmr
+    teams = data[1:7]
+    # bubble sort teams because data size is very low
+    swap = True
+    while swap:
+        swap = False
+        for i in range(0, len(teams) - 1):
+            if int(teams[i][5]) > int(teams[i+1][5]):
+                teams[i], teams[i + 1] = teams[i + 1], teams[i]
+                swap = True
+    # put sorted teams back into sheet
+    sheet.update("A2:F7", teams)
+
+    return teams
+    
+
+
+# get database connection and format
 def get_db_connection():
     conn = sqlite3.connect("database.db")
     conn.row_factory = sqlite3.Row
     return conn 
+
+
 
 # LOGIN AND SIGNUP
 
@@ -94,14 +130,24 @@ def signUp():
 def loginPage():
     return render_template("loginPage.html")
 
+
+
 # STANDINGS
 
 #fetch standings and put them in place order
 def getStandings():
-    conn = get_db_connection()
-    teams = conn.execute("SELECT * FROM teams ORDER BY place ASC").fetchall()
-    conn.close()
+    #get teams table from sheet
+    data = sheet.get_all_values()
+    
+    #extract teams from data
+    teams = data[1:7]
+
     return teams
+
+
+
+
+
 
 # GAMES
 
@@ -110,13 +156,26 @@ def getUpcomingGames(team):
     now = datetime.now()
     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db_connection()
-    #detect if it needs to be a specific team
-    if len(team) > 0:
-        games = conn.execute("SELECT * FROM games WHERE datetime > ? AND (home = ? OR away = ?)", (now_str, team, team)).fetchall()
+
+    #get data
+    data = sheet.get_all_values()
+    #get amount of games
+    gamesNumber = data[18][0]
+    #check for games
+    if gamesNumber == "0":
+        return None
     else:
-        games = conn.execute("SELECT * FROM games WHERE datetime > ?", (now_str,)).fetchall()
-    conn.close()
-    return games
+        #get games
+        games = data[20:20 + int(gamesNumber)]
+
+        #detect if it needs to be a specific team
+        if len(team) > 0:
+            tempGames = games
+            games = []
+            for game in tempGames:
+                if game[0] == team or game[1] == team:
+                    games.append(game)
+        return games
 
 #localise the time specific to the user
 def utc_to_local(utc_dt, timezone_str):
@@ -134,24 +193,23 @@ def getTimezonedGames(team):
 
     #localize each game
     for game in games_data:
-        #get utc datetime
-        game_dict = dict(game)
-        utc_dt = datetime.strptime(game_dict['datetime'], '%Y-%m-%d %H:%M:%S')
+        if game[2] != "-":
+            #get utc datetime
+            utc_dt = datetime.strptime(game[2], '%Y-%m-%d %H:%M:%S')
 
-        #localize it if able to get user's timezone
-        if user_timezone_str:
-            #give game local datetie
-            game_dict['local_datetime'] = utc_to_local(utc_dt, user_timezone_str).strftime('%Y-%m-%d %H:%M:%S')
-            # set abbreviated timezone
-            session["abbreviatedTimezone"] = utc_dt.astimezone(pytz.timezone(user_timezone_str)).tzname()
+            #localize it if able to get user's timezone
+            if user_timezone_str:
+                #give game local datetime
+                game[2] = utc_to_local(utc_dt, user_timezone_str).strftime('%Y-%m-%d %H:%M:%S')
+                # set abbreviated timezone
+                session["abbreviatedTimezone"] = utc_dt.astimezone(pytz.timezone(user_timezone_str)).tzname()
 
-        else:
-            #give user UTC times if not able to get timezone
-            game_dict['local_datetime'] = game_dict['datetime']
-            session["abbreviatedTimezone"] = "UTC"
+            else:
+                #give user UTC times if not able to get timezone
+                session["abbreviatedTimezone"] = "UTC"
 
         #put games back together again
-        updated_games.append(game_dict)
+        updated_games.append(game)
 
     return updated_games
 
@@ -442,34 +500,6 @@ def deleteTeamRoute(id):
     deleteTeam(id)
     return redirect("/admin")
 
-#update the teams' places
-def sortTeams():
-    #get teams and their mmr
-    conn = get_db_connection()
-    teams = conn.execute("SELECT id, mmr FROM teams").fetchall()
-
-    #put them in a list (named array because i like to think of it as an array)
-    array = []
-    for i in range(0,len(teams)):
-        array.append(teams[i])
-
-    # bubble sort teams because data size is very low
-    swap = True
-    while swap:
-        swap = False
-        for i in range(0, len(array) - 1):
-            if array[i]["mmr"] < array[i+1]["mmr"]:
-                array[i], array[i + 1] = array[i + 1], array[i]
-                swap = True
-    
-    # return places into database
-    for i in range(0,len(array)):
-        conn.execute("UPDATE teams SET place = ? WHERE id = ?", (i + 1, array[i]["id"]))
-    conn.commit()
-    conn.close()
-
-    #procedure so not returning anything
-            
 # games
 
 #handle updating game

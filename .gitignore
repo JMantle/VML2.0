@@ -20,3 +20,6 @@ instance/
 
 # Ignore pipenv lock file
 Pipfile.lock
+
+# ignore keys
+/keys

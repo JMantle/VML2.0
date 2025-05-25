@@ -92,38 +92,28 @@
             <th>Date & Time ({{ session["abbreviatedTimezone"] }})</th>
             <th>Home Players</th>
             <th>Away Players</th>
-            <th>Other Details</th>
           </tr>
         </thead>
         <tbody>
           {% for game in games %}
           <tr>
-            <td><a class="teamLink" href="/showTeam/{{ game['home'] }}">{{ game['home'] }}</a></td>
-            <td><a class="teamLink" href="/showTeam/{{ game['away'] }}">{{ game['away'] }}</a></td>
-            <td>{{ game['local_datetime'] }}</td>
+            <td><a class="teamLink" href="/showTeam/{{ game['home'] }}">{{ game[0] }}</a></td>
+            <td><a class="teamLink" href="/showTeam/{{ game['away'] }}">{{ game[1] }}</a></td>
+            <td>{{ game[2] }}</td>
             <td>
-              {% if game['homeplayers'] %}
               <ul class="player-list">
-                {% for player in game['homeplayers'].split(', ') %}
+                {% for player in game[3].split(', ') %}
                 <li>{{ player }}</li>
                 {% endfor %}
               </ul>
-              {% else %}
-              -
-              {% endif %}
             </td>
             <td>
-              {% if game['awayplayers'] %}
               <ul class="player-list">
-                {% for player in game['awayplayers'].split(', ') %}
+                {% for player in game[4].split(', ') %}
                 <li>{{ player }}</li>
                 {% endfor %}
               </ul>
-              {% else %}
-              -
-              {% endif %}
             </td>
-            <td>{{ game['other'] or '-' }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -145,30 +135,18 @@
           <th>Map Wins</th>
           <th>Match Wins</th>
           <th>Captain</th>
-          <th>Members</th>
           <th>Points</th>
           <th>MMR</th>
         </tr>
-        {% for team in teams %}
-        <tr onclick="window.location=`/showTeam/{{ team['name'] }}`;" class="teamClick">
-          <td>{{ team['place'] }}</td>
-          <td>{{ team['name'] }}</td>
-          <td>{{ team['mapwins'] }}</td>
-          <td>{{ team["matchwins"] }}</td>
-          <td>{{ team['captain'] }}</td>
-          <td>
-            {% if team["members"] %}
-            <ul class="member-list">
-              {% for member in team['members'].split(', ') %}
-                <li>{{ member }}</li>
-              {% endfor %}
-            </ul>
-            {% else %}
-              -
-            {% endif %}
-          </td>
-          <td>{{ team['points'] }}</td>
-          <td>{{ team['mmr'] }}</td>
+        {% for i in range(teams | length) %}
+        <tr onclick="window.location=`/showTeam/{{ teams[i][0] }}`;" class="teamClick">
+          <td>{{ i+1 }}</td>
+          <td>{{ teams[i][0] }}</td>
+          <td>{{ teams[i][2] }}</td>
+          <td>{{ teams[i][3] }}</td>
+          <td>{{ teams[i][5] }}</td>
+          <td>{{ teams[i][1] }}</td>
+          <td>{{ teams[i][5] }}</td>
         </tr>
         {% endfor %}
       </thead>
