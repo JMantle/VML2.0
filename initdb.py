@@ -146,7 +146,7 @@ def resetRequests():
 
         CREATE TABLE requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            teamid INT,
+            teamname TEXT NOT NULL,
             username TEXT,
             message TEXT
         )

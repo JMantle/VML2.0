@@ -216,24 +216,59 @@ def getTimezonedGames(team):
 
 # TEAM
 
+#find team by name
+def findTeam(teamName):
+    #get teams
+    teams = getStandings()
+    #find team in standings
+    for team in teams:
+        if team[0] == teamName:
+            return team
+    return None
+
+#find team row
+def findTeamRow(teamName):
+    #get teams
+    teams = getStandings()
+    #find team in standings
+    for i in range(0, len(teams)):
+        if teams[i][0] == teamName:
+            return i + 2 # because first is header and not 0 indexed
+    return None
+
 #show all team data on specific team
 @app.route("/showTeam/<string:teamName>")
 def team(teamName):
-    #get team stats
-    conn = get_db_connection()
-    stats = conn.execute("SELECT * FROM teams WHERE name = ?", (teamName,)).fetchone()
+
+    #get team and set stats
+    team = findTeam(teamName)
+    stats = {
+                "place": findTeamRow(teamName) - 1,
+                "name": team[0],
+                "mapwins": int(team[2]),
+                "matchwins": int(team[3]),
+                "captain": team[5],
+                "members": team[6],
+                "points": int(team[1]),
+                "mmr": int(team[4])
+            }
+
     #get upcoming games for that team
     games = getTimezonedGames(teamName)
+
+    #get database connection
+    conn = get_db_connection()
+
     #get membership requests for captain if the user is the captain
     if session.get("loggedIn") and stats["captain"] == session["username"]:
-        requests = conn.execute("SELECT * FROM requests WHERE teamid = ?", (stats["id"],)).fetchall()
+        requests = conn.execute("SELECT * FROM requests WHERE teamname = ?", (stats["name"],)).fetchall()
         conn.close()
         return render_template("team.html", stats=stats, games=games, captain=True, member=True, requests=requests)
     else:
         #take team members
         members = stats["members"] if stats["members"] is not None else ""
         #get if the user has already requested membership 
-        requested = bool(conn.execute("SELECT 1 FROM requests WHERE username = ? AND teamid = ?", (session["username"], stats["id"])).fetchone())
+        requested = bool(conn.execute("SELECT 1 FROM requests WHERE username = ? AND teamname = ?", (session["username"], stats["name"])).fetchone())
         #decide whether to show the request membership button or not.
         if (session["loggedIn"] and session["username"] in members) or  requested:
             member = True
@@ -244,43 +279,49 @@ def team(teamName):
         return render_template("team.html", stats=stats, games=games, captain=False, member=member)
     
 #handle user requesting membership
-@app.route("/requestMembership/<int:teamId>/<string:username>", methods=["POST"])
-def requestMembership(teamId, username):
+@app.route("/requestMembership/<string:teamName>/<string:username>", methods=["POST"])
+def requestMembership(teamName, username):
     #get message
     message = request.form.get("message")
     #put it in database
     conn = get_db_connection()
-    conn.execute("INSERT INTO requests (teamid, username, message) VALUES (?, ?, ?)", (teamId, username, message))
+    conn.execute("INSERT INTO requests (teamname, username, message) VALUES (?, ?, ?)", (teamName, username, message))
     conn.commit()
-
-    #get team to redirect to
-    team = conn.execute("SELECT name FROM teams WHERE id = ?", (teamId,)).fetchone()
     conn.close()
 
-    return redirect("/showTeam/" + team[0])
+    return redirect("/showTeam/" + teamName)
 
 # MANAGE TEAM
 
 #handle manage team being clicked
 @app.route("/manageTeam")
 def manageTeam():
-    #find team to redirect to
-    conn = get_db_connection()
-    team = conn.execute("SELECT name FROM teams WHERE captain = ?", (session["username"], )).fetchone()
-    conn.close()
-    return redirect("/showTeam/" + team[0])
+    #get teams
+    teams = getStandings()
+
+    #if all fails, just send em to apex (hopefully it dont)
+    teamName = "Apex"
+
+    for team in teams:
+        #check if user is captain of the team
+        if team[5] == session["username"]:
+            #get team name
+            teamName = team[0]
+            break
+    return redirect("/showTeam/" + teamName)
 
 #handle removing member from team
-@app.route("/removeFromTeam/<int:id>/<string:member>", methods=["POST"])
-def removeFromTeam(id, member):
-    #get members
-    conn = get_db_connection()
-    members = conn.execute("SELECT members FROM teams WHERE id = ?", (id,)).fetchone()
+@app.route("/removeFromTeam/<string:teamName>/<string:member>", methods=["POST"])
+def removeFromTeam(teamName, member):
+
+    #get team
+    team = findTeam(teamName)
+    members = team[6] if team[6] else ""
 
     #remove sepcific member
 
     #place each member in a list
-    membersString = members[0]
+    membersString = members
     members = []
     while len(membersString) > 0:
         comma = membersString.find(",")
@@ -303,59 +344,60 @@ def removeFromTeam(id, member):
     #add last item without comma
     membersString = membersString + members[len(members) - 1]
     
-    #put back into database
-    conn.execute("UPDATE teams SET members = ? where id = ?", (membersString.strip(), id))
-    conn.commit()
-    conn.close()
+    #get row of team
+    row = findTeamRow(teamName)
+
+    #put it back into sheet
+    sheet.update_cell(row + 2, 7, membersString)
 
     return redirect("/manageTeam")
 
 #handle adding members
-@app.route("/addMember/<int:id>", methods=["POST"])
-def addMember(id):
+@app.route("/addMember/<string:teamName>", methods=["POST"])
+def addMember(teamName):
     #get name
     name = request.form.get("name").strip()
 
     #get current members
-    conn = get_db_connection()
-    members = conn.execute("SELECT members FROM teams WHERE id = ?", (id,)).fetchone()[0]
+    team = findTeam(teamName)
+    members = team[6] if team[6] else ""
 
     #add to string
-    if members:
+    if members != "":
         #add to end if members already there
         members += ", " + name
     else:
         #become the first member
         members = name
 
-    #update database
-    conn.execute("UPDATE teams SET members = ? WHERE id = ?", (members, id))
-    conn.commit()
-    conn.close()
+    #update sheet
+    row = findTeamRow(teamName)
+    sheet.update_cell(row + 2, 7, members)
+
     #return to managing team
     return redirect("/manageTeam")
 
-#handle assigning players to games
-@app.route("/assignPlayers/<int:gameId>/<string:teamName>", methods=["POST"])
-def assignPlayers(gameId, teamName):
-    #get data
-    players = request.form.get("players").strip()
-    conn = get_db_connection()
-
-    #figure out whether team is home or away
-    side = conn.execute("SELECT home FROM games WHERE id = ?", (gameId,)).fetchone()
-    if side[0] == teamName:
-        #home team
-        conn.execute("UPDATE games SET homeplayers = ? WHERE id = ?", (players, gameId))
-    else:
-        #away team
-        conn.execute("UPDATE games SET awayplayers = ? WHERE id = ?", (players, gameId))
-
-    conn.commit()
-    conn.close()
-
-    #return to manage team
-    return redirect("/manageTeam")
+#handle assigning players to games                                              (might need idk yet)
+#@app.route("/assignPlayers/<int:gameId>/<string:teamName>", methods=["POST"])
+#def assignPlayers(gameId, teamName):
+#    #get data
+#    players = request.form.get("players").strip()
+#    conn = get_db_connection()
+#
+#    #figure out whether team is home or away
+#    side = conn.execute("SELECT home FROM games WHERE id = ?", (gameId,)).fetchone()
+#    if side[0] == teamName:
+#        #home team
+#        conn.execute("UPDATE games SET homeplayers = ? WHERE id = ?", (players, gameId))
+#    else:
+#        #away team
+#        conn.execute("UPDATE games SET awayplayers = ? WHERE id = ?", (players, gameId))
+#
+#    conn.commit()
+#    conn.close()
+#
+#    #return to manage team
+#    return redirect("/manageTeam")
 
 #handle accepting membership requests
 @app.route("/acceptRequest/<int:id>", methods=["POST"])
@@ -364,17 +406,24 @@ def acceptRequest(id):
 
     #get request
     request = conn.execute("SELECT * FROM requests WHERE id = ?", (id,)).fetchone()
-    #insert it into members
-    members = conn.execute("SELECT members FROM teams WHERE id = ?", (request["teamid"],)).fetchone()[0] or ""
-    #checking to see if members already has members
-    if members:
-        members += ", " + request["username"]
-    else:
-        members = request["username"]
+    teamName = request["teamname"]
+    name = request["username"]
 
-    conn.execute("UPDATE teams SET members = ? WHERE id = ?", (members, request["teamid"]))
-    conn.commit()
-    conn.close()
+    #get current members
+    team = findTeam(teamName)
+    members = team[6] if team[6] else ""
+
+    #add to string
+    if members != "":
+        #add to end if members already there
+        members += ", " + name
+    else:
+        #become the first member
+        members = name
+
+    #update sheet
+    row = findTeamRow(teamName)
+    sheet.update_cell(row + 2, 7, members)
 
     #delete request
     deleteRequest(id)
@@ -436,127 +485,127 @@ def updateUser(id):
 
 # teams
 
-#handle updating team data
-@app.route("/updateTeam/<int:id>", methods=["POST"])
-def updateTeam(id):
-    conn = get_db_connection()
-
-    #get inputted data
-    name = request.form.get("name").strip()
-    mapWins = request.form.get("mapwins").strip()
-    matchWins = request.form.get("matchwins").strip()
-    captain = request.form.get("captain").strip()
-    members = request.form.get("members").strip()
-    points = request.form.get("points").strip()
-    mmr = request.form.get("mmr").strip()
-
-    #get previous data
-    team = conn.execute("SELECT * FROM teams WHERE id = ?", (id,)).fetchone()
-
-    #update data if inputted, otherwise result to previous data
-    updatedName = name if name else team['name']
-    updatedMapWins = mapWins if mapWins else team['mapwins']
-    updatedMatchWins = matchWins if matchWins else team['matchwins']
-    updatedCaptain = captain if captain else team['captain']
-    updatedMembers = members if members else team["members"]
-    updatedPoints = points if points else team['points']
-    updatedmmr = mmr if mmr else team["mmr"]
-
-    #return to database
-    conn.execute("UPDATE teams SET name = ?, mapwins = ?, matchwins = ?, captain = ?, members = ?, points = ?, mmr = ? WHERE id = ?", (updatedName, updatedMapWins, updatedMatchWins, updatedCaptain, updatedMembers, updatedPoints, updatedmmr, id))
-
-    conn.commit()
-    conn.close()
-
-    #update their places (mmr could be changed affecting the order of the teams)
-    sortTeams()
-
-    return redirect("/admin")
-
-#handle creation of teams
-@app.route("/createTeam", methods=["POST"])
-def createTeam():
-
-    #get data
-    name = request.form.get("name").strip()
-    mapwins = request.form.get("mapwins").strip()
-    matchwins = request.form.get("matchwins").strip()
-    captain = request.form.get("captain").strip()
-    points = request.form.get("points").strip()
-    mmr = request.form.get("mmr").strip()
-
-    #make team using the data
-    makeTeam(name, mapwins, matchwins, captain, points, mmr)
-    
-    #update teams places
-    sortTeams()
-
-    return redirect("/admin")
-
-#handle deleting team
-@app.route("/deleteTeam/<int:id>", methods=["POST"])
-def deleteTeamRoute(id):
-    #delete team
-    deleteTeam(id)
-    return redirect("/admin")
-
+##handle updating team data                                    (might be needed idk yet)
+#@app.route("/updateTeam/<int:id>", methods=["POST"])
+#def updateTeam(id):
+#    conn = get_db_connection()
+#
+#    #get inputted data
+#    name = request.form.get("name").strip()
+#    mapWins = request.form.get("mapwins").strip()
+#    matchWins = request.form.get("matchwins").strip()
+#    captain = request.form.get("captain").strip()
+#    members = request.form.get("members").strip()
+#    points = request.form.get("points").strip()
+#    mmr = request.form.get("mmr").strip()
+#
+#    #get previous data
+#    team = conn.execute("SELECT * FROM teams WHERE id = ?", (id,)).fetchone()
+#
+#    #update data if inputted, otherwise result to previous data
+#    updatedName = name if name else team['name']
+#    updatedMapWins = mapWins if mapWins else team['mapwins']
+#    updatedMatchWins = matchWins if matchWins else team['matchwins']
+#    updatedCaptain = captain if captain else team['captain']
+#    updatedMembers = members if members else team["members"]
+#    updatedPoints = points if points else team['points']
+#    updatedmmr = mmr if mmr else team["mmr"]
+#
+#    #return to database
+#    conn.execute("UPDATE teams SET name = ?, mapwins = ?, matchwins = ?, captain = ?, members = ?, points = ?, mmr = ? WHERE id = ?", (updatedName, updatedMapWins, updatedMatchWins, updatedCaptain, updatedMembers, updatedPoints, updatedmmr, id))
+#
+#    conn.commit()
+#    conn.close()
+#
+#    #update their places (mmr could be changed affecting the order of the teams)
+#    sortTeams()
+#
+#    return redirect("/admin")
+#
+##handle creation of teams                       (might be needed idk yet)
+#@app.route("/createTeam", methods=["POST"])
+#def createTeam():
+#
+#    #get data
+#    name = request.form.get("name").strip()
+#    mapwins = request.form.get("mapwins").strip()
+#    matchwins = request.form.get("matchwins").strip()
+#    captain = request.form.get("captain").strip()
+#    points = request.form.get("points").strip()
+#    mmr = request.form.get("mmr").strip()
+#
+#    #make team using the data
+#    makeTeam(name, mapwins, matchwins, captain, points, mmr)
+#    
+#    #update teams places
+#    sortTeams()
+#
+#    return redirect("/admin")
+#
+##handle deleting team
+#@app.route("/deleteTeam/<int:id>", methods=["POST"])
+#def deleteTeamRoute(id):
+#    #delete team
+#    deleteTeam(id)
+#    return redirect("/admin")
+#
 # games
 
-#handle updating game
-@app.route("/updateGame/<int:id>", methods=["POST"])
-def updateGame(id):
-    conn = get_db_connection()
-
-    #get data
-    home = request.form.get("home").strip()
-    away = request.form.get("away").strip()
-    datetime = request.form.get("datetime").strip()
-    homePlayers = request.form.get("homeplayers").strip()
-    awayPlayers = request.form.get("awayplayers").strip()
-    other = request.form.get("other").strip()
-    
-    #get previous data
-    game = conn.execute("SELECT * FROM games WHERE id = ?", (id,)).fetchone()
-
-    #update data if there is new data, otherwise use previous data
-    updatedHome = home if home else game['home']
-    updatedAway = away if away else game['away']
-    updatedDatetime = datetime if datetime else game['datetime']
-    updatedHomePlayers = homePlayers if homePlayers else game['homeplayers']
-    updatedAwayPlayers = awayPlayers if awayPlayers else game["awayplayers"]
-    updatedOther = other if other else game['other']
-
-    #put it back in database
-    conn.execute("UPDATE games SET home = ?, away = ?, datetime = ?, homeplayers = ?, awayplayers = ?, other = ? WHERE id = ?", (updatedHome, updatedAway, updatedDatetime, updatedHomePlayers, updatedAwayPlayers, updatedOther, id))
-
-    conn.commit()
-    conn.close()
-
-    return redirect("/admin")
-
-#handle deleting game
-@app.route("/deleteGame/<int:id>", methods=["POST"])
-def deleteGameRoute(id):
-    #delete game
-    deleteGame(id)
-    return redirect("/admin")
-
-#handle creating a game
-@app.route("/createGame", methods=["POST"])
-def createGame():
-
-    #get data
-    home = request.form.get("home").strip()
-    away = request.form.get("away").strip()
-    datetime = request.form.get("datetime").strip()
-
-    #make game
-    makeGame(home, away, datetime)
-
-    #update places
-    sortTeams()
-    
-    return redirect("/admin")
+##handle updating game
+#@app.route("/updateGame/<int:id>", methods=["POST"])
+#def updateGame(id):
+#    conn = get_db_connection()
+#
+#    #get data
+#    home = request.form.get("home").strip()
+#    away = request.form.get("away").strip()
+#    datetime = request.form.get("datetime").strip()
+#    homePlayers = request.form.get("homeplayers").strip()
+#    awayPlayers = request.form.get("awayplayers").strip()
+#    other = request.form.get("other").strip()
+#    
+#    #get previous data
+#    game = conn.execute("SELECT * FROM games WHERE id = ?", (id,)).fetchone()
+#
+#    #update data if there is new data, otherwise use previous data
+#    updatedHome = home if home else game['home']
+#    updatedAway = away if away else game['away']
+#    updatedDatetime = datetime if datetime else game['datetime']
+#    updatedHomePlayers = homePlayers if homePlayers else game['homeplayers']
+#    updatedAwayPlayers = awayPlayers if awayPlayers else game["awayplayers"]
+#    updatedOther = other if other else game['other']
+#
+#    #put it back in database
+#    conn.execute("UPDATE games SET home = ?, away = ?, datetime = ?, homeplayers = ?, awayplayers = ?, other = ? WHERE id = ?", (updatedHome, updatedAway, updatedDatetime, updatedHomePlayers, updatedAwayPlayers, updatedOther, id))
+#
+#    conn.commit()
+#    conn.close()
+#
+#    return redirect("/admin")
+#
+##handle deleting game
+#@app.route("/deleteGame/<int:id>", methods=["POST"])
+#def deleteGameRoute(id):
+#    #delete game
+#    deleteGame(id)
+#    return redirect("/admin")
+#
+##handle creating a game
+#@app.route("/createGame", methods=["POST"])
+#def createGame():
+#
+#    #get data
+#    home = request.form.get("home").strip()
+#    away = request.form.get("away").strip()
+#    datetime = request.form.get("datetime").strip()
+#
+#    #make game
+#    makeGame(home, away, datetime)
+#
+#    #update places
+#    sortTeams()
+#    
+#    return redirect("/admin")
 
 #handle deleting messages
 @app.route("/deleteMessage/<int:id>", methods=["POST"])
@@ -638,8 +687,3 @@ def root():
 if __name__ == "__main__":
     app.run(debug=True)
 
-
-
-
-
-# 

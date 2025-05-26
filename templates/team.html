@@ -74,12 +74,12 @@
             <section class="team-members">
                 <h2>Team Members</h2>
                 <div id="players-container">
-                    {% if stats['members'] %}
+                    {% if stats['members'] != "-" %}
                         {% for member in stats['members'].split(', ') %}
                             <div class="player-card">
                                 <p>{{ member }}</p>
                                 {% if captain %}
-                                <form action="/removeFromTeam/{{ stats['id'] }}/{{ member }}" method="POST">
+                                <form action="/removeFromTeam/{{ stats['name'] }}/{{ member }}" method="POST">
                                     <button type="submit">Remove</button>
                                 </form>
                                 {% endif %}
@@ -92,7 +92,7 @@
                     {% endif %}
                     {% if captain %}
                     <div class="player-card">
-                        <form action="/addMember/{{ stats['id'] }}" method="POST">
+                        <form action="/addMember/{{ stats['name'] }}" method="POST">
                             <input class="addMemberInput" name="name" placeholder="Username" type="text">
                             <button type="submit">Add Member</button>
                         </form>
@@ -102,7 +102,7 @@
             </section>
 
             <!-- UPCOMING GAMES -->
-             <section class="team-games">
+            <section id="games" class="section">
               <h2>Upcoming Games</h2>
               <div class="games-container">
                 {% if games %}
@@ -114,49 +114,28 @@
                       <th>Date & Time ({{ session["abbreviatedTimezone"] }})</th>
                       <th>Home Players</th>
                       <th>Away Players</th>
-                      <th>Other Details</th>
-                      {% if captain %}
-                      <th>Assign Players</th>
-                      {% endif %}
                     </tr>
                   </thead>
                   <tbody>
                     {% for game in games %}
                     <tr>
-                      <td><a class="teamLink" href="/showTeam/{{ game['home'] }}">{{ game['home'] }}</a></td>
-                      <td><a class="teamLink" href="/showTeam/{{ game['away'] }}">{{ game['away'] }}</a></td>
-                      <td>{{ game['local_datetime'] }}</td>
+                      <td><a class="teamLink" href="/showTeam/{{ game[0] }}">{{ game[0] }}</a></td>
+                      <td><a class="teamLink" href="/showTeam/{{ game[1] }}">{{ game[1] }}</a></td>
+                      <td>{{ game[2] }}</td>
                       <td>
-                        {% if game['homeplayers'] %}
                         <ul class="player-list">
-                          {% for player in game['homeplayers'].split(', ') %}
+                          {% for player in game[3].split(', ') %}
                           <li>{{ player }}</li>
                           {% endfor %}
                         </ul>
-                        {% else %}
-                        -
-                        {% endif %}
                       </td>
                       <td>
-                        {% if game['awayplayers'] %}
                         <ul class="player-list">
-                          {% for player in game['awayplayers'].split(', ') %}
+                          {% for player in game[4].split(', ') %}
                           <li>{{ player }}</li>
                           {% endfor %}
                         </ul>
-                        {% else %}
-                        -
-                        {% endif %}
                       </td>
-                      <td>{{ game['other'] or '-' }}</td>
-                      {% if captain %}
-                      <td>
-                        <form action="/assignPlayers/{{ game['id'] }}/{{ stats['name'] }}" method="POST">
-                            <input type="text" name="players" placeholder="player1, player2, player3...">
-                            <button type="submit">Assign Players</button>
-                        </form>
-                      </td>
-                      {% endif %}
                     </tr>
                     {% endfor %}
                   </tbody>
@@ -172,8 +151,8 @@
                 {% if not member %}
                 <h2>Join Team</h2>
                 {% if session['loggedIn'] %}
-                    <form action="/requestMembership/{{ stats['id'] }}/{{ session['username']}}" method="POST">
-                        <textarea type="text" name="message" method="POST" placeholder="Enter Message to the captain"></textarea>
+                    <form action="/requestMembership/{{ stats['name'] }}/{{ session['username']}}" method="POST">
+                        <textarea type="text" name="message" method="POST" placeholder="Enter Message to the captain (highly recommend to include discord name and tag)"></textarea>
                         <button type="submit">Request Membership</button>
                     </form>
                 {% else %}
