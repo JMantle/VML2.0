@@ -153,9 +153,6 @@ def getStandings():
 
 #get upcoming game data 
 def getUpcomingGames(team):
-    now = datetime.now()
-    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
-    conn = get_db_connection()
 
     #get data
     data = sheet.get_all_values()
@@ -188,6 +185,14 @@ def getTimezonedGames(team):
     #get times and timezone
     games_data = getUpcomingGames(team)
     user_timezone_str = session.get('timezone') 
+
+    #format datetimes to normalize
+    for game in games_data:
+        if game[2] != "-":
+            #convert string to datetime
+            date, time = game[2].split("_")
+            day, month, year = date.split("-")
+            game[2] = f"{year}-{month}-{day} {time}:00"
 
     updated_games = []
 
