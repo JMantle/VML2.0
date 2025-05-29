@@ -223,16 +223,19 @@ async def setdatetime(ctx, id: int, datetime: str):
                 otherTeam = home if any(role.name == f"{away} Captain" for role in ctx.author.roles) else away
                 roleName = f"{otherTeam} Captain"
                 otherCaptainRole = discord.utils.get(ctx.guild.roles, name=roleName)
-                message = await ctx.send(f"Game datetime set to {datetime} by {ctx.author.mention} for game ID {id}. Please confirm this with a **reaction** {otherCaptainRole.mention}")
+                adminRole = discord.utils.get(ctx.guild.roles, name="admin")
+                message = await ctx.send(f"Game datetime set to {datetime} by {ctx.author.mention} for game ID {id}. Please confirm this with a **✅ reaction** or deny it with a **❌ reaction** {otherCaptainRole.mention}")
                 # check for reaction
-                emoji = "✅"
-                await message.add_reaction(emoji)
+                confirmEmoji = "✅"
+                denyEmoji = "❌"
+                await message.add_reaction(confirmEmoji)
+                await message.add_reaction(denyEmoji)
 
                 def check(reaction, user):
                     print(f"Reaction: {reaction.emoji}, User: {user}")
                     return (
                         user != bot.user and
-                        str(reaction.emoji) == emoji and
+                        str(reaction.emoji) in [confirmEmoji, denyEmoji] and
                         reaction.message.id == message.id
                     )
 
@@ -243,27 +246,27 @@ async def setdatetime(ctx, id: int, datetime: str):
                             reaction, user = await bot.wait_for("reaction_add", timeout=60.0, check=check)
                             guild = bot.guilds[0]
                             member = guild.get_member(user.id)
-                            if member and otherCaptainRole in member.roles:
-                                print(f"Confirmation received from {member.display_name}")
-                                confirmed = True
-                                await ctx.send(f"Game time confirmed by {member.mention} at {datetime}.")
-                                # Update the game time in the sheet
-                                gameAmount = int(sheet.cell(19, 1).value)
-                                games = sheet.get_values(f"A21:F{21 + gameAmount}")
-                                for game in games:
-                                    if game[5] == str(id):
-                                        # update the game time
-                                        sheet.update_cell(21 + games.index(game), 3, datetime)
-                                        await ctx.send(f"Game time for ID {id} updated to {datetime}.")
-                                        break
-                            else:
-                                pass
+                            if member and (otherCaptainRole in member.roles or adminRole in member.roles):
+                                if str(reaction.emoji) == denyEmoji:
+                                    await ctx.send(f"Game time denied by {member.mention}. Please use !setdatetime again to set the datetime.")
+                                    return
+                                elif str(reaction.emoji) == confirmEmoji:
+                                    # confirmation received
+                                    print(f"Confirmation received from {member.display_name}")
+                                    confirmed = True
+                                    await ctx.send(f"Game time confirmed by {member.mention} at {datetime}.")
+                                    # Update the game time in the sheet
+                                    gameAmount = int(sheet.cell(19, 1).value)
+                                    games = sheet.get_values(f"A21:F{21 + gameAmount}")
+                                    for game in games:
+                                        if game[5] == str(id):
+                                            # update the game time
+                                            sheet.update_cell(21 + games.index(game), 3, datetime)
+                                            await ctx.send(f"Game time for ID {id} updated to {datetime}.")
+                                            return
                             # game confirmed
                     except asyncio.TimeoutError:
-                        await ctx.send(" No confirmation received, use !setdatetime again to set the datetime.")
-
-            
-        
+                        await ctx.send(f" No confirmation received, {otherCaptainRole.mention}, please confirm.")
     except ValueError:
         await ctx.send("Invalid time format. Use DD-MM-YYYY HH:MM (24-hour format).")
         print(ValueError)
@@ -310,9 +313,71 @@ async def setteam(ctx, id: int, *, players: str):
 
 # Command to give in results of a game
 @bot.command()
-async def result(ctx, id: int, homeScore: int, awayScore: int):
-    #####
-    return 
+async def result(ctx, id: int, game1: str, game2: str, game3: str):
+    if not(discord.utils.get(ctx.author.roles, name=f"{game1} Captain") or discord.utils.get(ctx.author.roles, name=f"{game2} Captain") or discord.utils.get(ctx.author.roles, name=f"admin")):
+        await ctx.send("You do not have permission to use this command.")
+        return
+    
+    #requires authorization if not an admin
+    authorized = True if discord.utils.get(ctx.author.roles, name="admin") else False
+
+    # Validate the input and clean it a bit
+    valid = True
+    for game in [game1.strip(), game2.strip(), game3.strip()]:
+        if not(game[0].isdigit() and game[2].isdigit() and game[1] == ":") or not(0 <= int(game[0]) <= 9 and 0 <= int(game[2]) <= 9): 
+            valid = False
+            break
+    if not valid:
+        await ctx.send("Invalid format. Use `!result ID Game1 Game2 Game3` where each game is in the format `X:Y` (e.g. `1:0`).")
+        return
+    elif not authorized:
+        (home, away) = findTeamsFromGame(id)
+        otherTeam = home if any(role.name == f"{away} Captain" for role in ctx.author.roles) else away
+        roleName = f"{otherTeam} Captain"
+        otherCaptainRole = discord.utils.get(ctx.guild.roles, name=roleName)
+        adminRole = discord.utils.get(ctx.guild.roles, name="admin")
+        message = await ctx.send(f"Scores set as {game1} | {game2} | {game3} by {ctx.author.mention} for game ID {id}. Please confirm this with a **reaction** {otherCaptainRole.mention}")
+        # check for reaction
+        confirmEmoji = "✅"
+        denyEmoji = "❌"
+
+        await message.add_reaction(confirmEmoji)
+        await message.add_reaction(denyEmoji)
+
+        def check(reaction, user):
+            print(f"Reaction: {reaction.emoji}, User: {user}")
+            return (
+                user != bot.user and
+                str(reaction.emoji) in [confirmEmoji, denyEmoji] and
+                reaction.message.id == message.id
+            )
+        
+        # continuously try until confirmed
+        confirmed = False
+        while not confirmed:
+            try:
+                if not confirmed:
+                    reaction, user = await bot.wait_for("reaction_add", timeout=60.0, check=check)
+                    guild = bot.guilds[0]
+                    member = guild.get_member(user.id)
+                    # make sure captain or admin
+                    if member and (otherCaptainRole in member.roles or adminRole in member.roles):
+                        if str(reaction.emoji) == denyEmoji:
+                            await ctx.send(f"Game score denied by {member.mention}. Please use !result again to set the scores.")
+                            return
+                        elif str(reaction.emoji) == confirmEmoji:
+                            print(f"Confirmation received from {member.display_name}")
+                            confirmed = True
+                            await ctx.send(f"Game score confirmed by {member.mention} as {game1}, {game2}, {game3}.")
+                            ## run subroutine i am bout to make
+            except asyncio.TimeoutError:
+                        await ctx.send(f" No confirmation received, {otherCaptainRole.mention}, please confirm.")
+    elif authorized:
+        await ctx.send(f"Game score set as {game1}, {game2}, {game3} for game ID {id} by {ctx.author.mention}.")
+        ## run subroutine i am bout to make
+
+
+
 
 
 
@@ -345,3 +410,7 @@ if __name__ == "__main__":
         botToken = tokenFile.read().strip()
     print("Starting")
     bot.run(botToken)
+
+
+
+# TODO CLEAN IDS
