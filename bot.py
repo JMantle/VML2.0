@@ -325,7 +325,12 @@ async def setteam(ctx, id: int, *, players: str):
 # Command to give in results of a game
 @bot.command()
 async def result(ctx, id: int, game1: str, game2: str, game3: str):
-    if not(discord.utils.get(ctx.author.roles, name=f"{game1} Captain") or discord.utils.get(ctx.author.roles, name=f"{game2} Captain") or discord.utils.get(ctx.author.roles, name=f"admin")):
+    try:
+        (home, away) = findTeamsFromGame(id)
+    except:
+        await ctx.send(f"No game found with ID {id}. Please check the ID and try again.")
+        return
+    if not(discord.utils.get(ctx.author.roles, name=f"{home} Captain") or discord.utils.get(ctx.author.roles, name=f"{away} Captain") or discord.utils.get(ctx.author.roles, name=f"admin")):
         await ctx.send("You do not have permission to use this command.")
         return
     
@@ -342,11 +347,6 @@ async def result(ctx, id: int, game1: str, game2: str, game3: str):
         await ctx.send("Invalid format. Use `!result ID Game1 Game2 Game3` where each game is in the format `X:Y` (e.g. `1:0`).")
         return
     elif not authorized:
-        try:
-            (home, away) = findTeamsFromGame(id)
-        except TypeError:
-            await ctx.send(f"No game found with ID {id}. Please check the ID and try again.")
-            return
         otherTeam = home if any(role.name == f"{away} Captain" for role in ctx.author.roles) else away
         roleName = f"{otherTeam} Captain"
         otherCaptainRole = discord.utils.get(ctx.guild.roles, name=roleName)
@@ -384,13 +384,136 @@ async def result(ctx, id: int, game1: str, game2: str, game3: str):
                             print(f"Confirmation received from {member.display_name}")
                             confirmed = True
                             await ctx.send(f"Game score confirmed by {member.mention} as {game1}, {game2}, {game3}.")
-                            ## run subroutine i am bout to make
+                            if await setresults(id, game1, game2, game3):
+                                await ctx.send(f"Game score set as {game1}, {game2}, {game3} for game ID {id} by {ctx.author.mention}.")
+                                await standings(ctx)
+                            else:
+                                await ctx.send(f"Error setting game score for ID {id}.")
+                            if await moveToFinishedGames(id, game1, game2, game3):
+                                await ctx.send(f"Game with ID {id} moved to finished games.")
+                            else:
+                                await ctx.send(f"Error moving game with ID {id} to finished games.")
+                                return
             except asyncio.TimeoutError:
                         await ctx.send(f" No confirmation received, {otherCaptainRole.mention}, please confirm.")
     elif authorized:
         await ctx.send(f"Game score set as {game1}, {game2}, {game3} for game ID {id} by {ctx.author.mention}.")
-        ## run subroutine i am bout to make
+        if await setresults(id, game1, game2, game3):
+            await ctx.send(f"Game score set as {game1}, {game2}, {game3} for game ID {id} by {ctx.author.mention}.")
+            await standings(ctx)
+        else:
+            await ctx.send(f"Error setting game score for ID {id}.")
+        if await moveToFinishedGames(id, game1, game2, game3):
+            await ctx.send(f"Game with ID {id} moved to finished games.")
+            return
+        else:
+            await ctx.send(f"Error moving game with ID {id} to finished games.")
+            return
 
+# set results into sheet and update standings
+async def setresults(id, game1, game2, game3):
+    try:
+        # get teams to update their stats
+        (home, away) = findTeamsFromGame(id)
+        # get standings
+        standings = getStandings()  
+        # find home and away teams in standings
+
+        homeTeam = []
+        awayTeam = []
+
+        for team in standings:
+            if team[0] == home:
+                for item in team:
+                    if item.isdigit():
+                        # convert to int and store in homeTeam
+                        homeTeam.append(int(item))
+                    else:
+                        homeTeam.append(item)
+            elif team[0] == away:
+                for item in team:
+                    if item.isdigit():
+                        # convert to int and store in homeTeam
+                        awayTeam.append(int(item))
+                    else:
+                        awayTeam.append(item)
+        # update points
+        games = [game1, game2, game3]
+        for game in games:
+            homeTeam[1] += int(game[0])
+            awayTeam[1] += int(game[2])
+        # update map wins (and count map wins for match wins)
+        homeTeamMapWins = 0
+        awayTeamMapWins = 0
+        for game in games:
+            if int(game[0]) > int(game[2]):
+                homeTeam[2] += 1
+                homeTeamMapWins += 1
+            elif int(game[0]) < int(game[2]):
+                awayTeam[2] += 1
+                awayTeamMapWins += 1
+            else:
+                # shoot out an error message to standings channel because i dont want to pass ctx
+                guild = bot.guilds[0]
+                for channel in guild.text_channels:
+                    if channel.name == "standings":
+                        await channel.send("big ole error, map wins are equal, this should not happen")
+        # update match wins
+        if homeTeamMapWins > awayTeamMapWins:
+            homeTeam[3] += 1
+        else:
+            awayTeam[3] += 1
+        # update mmr
+        homeTeam[4] = homeTeam[1] + (homeTeam[2] * 2) + (homeTeam[3] * 10)
+        awayTeam[4] = awayTeam[1] + (awayTeam[2] * 2) + (awayTeam[3] * 10)
+        # update standings in sheet
+        for i, team in enumerate(standings, start=1):
+            if team[0] == home:
+                sheet.update_cell(1 + i, 2, str(homeTeam[1]))
+                sheet.update_cell(1 + i, 3, str(homeTeam[2]))
+                sheet.update_cell(1 + i, 4, str(homeTeam[3]))
+                sheet.update_cell(1 + i, 5, str(homeTeam[4]))
+            elif team[0] == away:
+                sheet.update_cell(1 + i, 2, str(awayTeam[1]))
+                sheet.update_cell(1 + i, 3, str(awayTeam[2]))
+                sheet.update_cell(1 + i, 4, str(awayTeam[3]))
+                sheet.update_cell(1 + i, 5, str(awayTeam[4]))
+            return True
+    except Exception as e:
+        print(e)
+        return False
+
+# move teams to the finished games section
+async def moveToFinishedGames(id, game1, game2, game3):
+    # find next spot in the finished games section
+    finishedGamesNumber = int(sheet.cell(48, 2).value)
+    # find the game in the sheet
+    gameAmount = int(sheet.cell(19, 1).value)
+    games = sheet.get_values(f"A21:F{21 + gameAmount}")
+    for i, game in enumerate(games):
+        if game[5] == str(id):
+            # move the game to the finished games section
+            finishedGamesRange = f"A{50 + finishedGamesNumber}:I{50 + gameAmount}"
+            game = [game[0], game[1], game[2], game[3], game[4], game[5], game1, game2, game3]
+            sheet.update([game], finishedGamesRange)
+            # remove the game from the upcoming games section
+            for index in range(i, gameAmount):
+                next_game = sheet.row_values(21 + index + 1)
+                sheet.update([next_game], f"A{21 + index}:F{21 + index}")
+            # clear the game in the upcoming games section
+            sheet.update([["", "", "", "", "", ""]], f"A{21 + gameAmount}:F{20 + gameAmount}")
+            # increment the finished games number
+            sheet.update_cell(48, 2, str(finishedGamesNumber + 1))
+            # update the game amount
+            sheet.update_cell(19, 1, str(gameAmount - 1))
+            return True
+    return False
+
+
+
+    
+
+            
 
 
 
@@ -410,13 +533,6 @@ async def on_ready():
                 embed = formatStandings()
                 print("running")
                 await channel.send(embed=embed)
-                embed2 = discord.Embed(title="title", color=discord.Color.green())
-                embed2.description = "decription"
-                embed2.add_field(name="field", value="value", inline=False)
-                embed2.set_footer(text="footer")
-                embed2.color = discord.Color.red()
-                embed2.type = "rich"
-                await channel.send(embed=embed2)
                 return
 
 #run bot
@@ -426,6 +542,3 @@ if __name__ == "__main__":
     print("Starting")
     bot.run(botToken)
 
-
-
-# TODO CLEAN IDS

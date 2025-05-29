@@ -124,7 +124,7 @@
     </div>
   </section>
 
-  <!-- LEADERBOAD -->
+  <!-- LEADERBOARD -->
   <section id="teams" class="section">
     <h2>Teams Leaderboard</h2>
     <table id="leaderboard" class="leaderboard-table">
@@ -132,21 +132,21 @@
         <tr>
           <th>Rank</th>
           <th>Team</th>
+          <th>Points</th>
           <th>Map Wins</th>
           <th>Match Wins</th>
           <th>Captain</th>
-          <th>Points</th>
           <th>MMR</th>
         </tr>
         {% for i in range(teams | length) %}
         <tr onclick="window.location=`/showTeam/{{ teams[i][0] }}`;" class="teamClick">
           <td>{{ i+1 }}</td>
           <td>{{ teams[i][0] }}</td>
+          <td>{{ teams[i][1] }}</td>
           <td>{{ teams[i][2] }}</td>
           <td>{{ teams[i][3] }}</td>
           <td>{{ teams[i][5] }}</td>
-          <td>{{ teams[i][1] }}</td>
-          <td>{{ teams[i][5] }}</td>
+          <td>{{ teams[i][4] }}</td>
         </tr>
         {% endfor %}
       </thead>
