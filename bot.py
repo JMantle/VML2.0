@@ -40,6 +40,8 @@ def findTeamsFromGame(id):
     for game in games:
         if game[5] == str(id):
             return game[0], game[1]
+        
+
 
 
 # NORMAL COMMANDS
@@ -196,6 +198,9 @@ async def notifyCaptains(homeTeam, awayTeam, gameId):
 async def setdatetime(ctx, id: int, datetime: str):
     # find teams involved in the game
     (home, away) = findTeamsFromGame(id)
+    if not home or not away:
+        await ctx.send(f"No game found with ID {id}. Please check the ID and try again.")
+        return
     print(f"Setting datetime for game {id} between {home} and {away}")
     # Ensure the command is run by an admin
     if not(discord.utils.get(ctx.author.roles, name=f"{home} Captain") or discord.utils.get(ctx.author.roles, name=f"{away} Captain")):
@@ -278,13 +283,19 @@ async def setdatetime(ctx, id: int, datetime: str):
 # Command to set the team for a game
 @bot.command()
 async def setteam(ctx, id: int, *, players: str):
-    # Ensure the command is run by a captain of one of the teams
-    (home, away) = findTeamsFromGame(id)
-    if not(discord.utils.get(ctx.author.roles, name=f"{home} Captain") or discord.utils.get(ctx.author.roles, name=f"{away} Captain")):
+    # Ensure the command is run by a captain of the team
+    if not(discord.utils.get(ctx.author.roles, name=f"{findTeamsFromGame(id)[0]} Captain") or discord.utils.get(ctx.author.roles, name=f"{findTeamsFromGame(id)[1]} Captain")):
         await ctx.send("You do not have permission to use this command.")
         return
 
-    # Validate the input
+    # validate id
+    try:
+        (home, away) = findTeamsFromGame(id)
+    except TypeError:
+        await ctx.send(f"No game found with ID {id}. Please check the ID and try again.")
+        return
+
+    # Validate the input and clean it a bit
     players = players.strip()
     if not players:
         await ctx.send("Please provide a list of players, seperated by commas.")
@@ -331,7 +342,11 @@ async def result(ctx, id: int, game1: str, game2: str, game3: str):
         await ctx.send("Invalid format. Use `!result ID Game1 Game2 Game3` where each game is in the format `X:Y` (e.g. `1:0`).")
         return
     elif not authorized:
-        (home, away) = findTeamsFromGame(id)
+        try:
+            (home, away) = findTeamsFromGame(id)
+        except TypeError:
+            await ctx.send(f"No game found with ID {id}. Please check the ID and try again.")
+            return
         otherTeam = home if any(role.name == f"{away} Captain" for role in ctx.author.roles) else away
         roleName = f"{otherTeam} Captain"
         otherCaptainRole = discord.utils.get(ctx.guild.roles, name=roleName)
