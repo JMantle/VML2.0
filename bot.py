@@ -3,7 +3,7 @@ from discord.ext import commands
 import gspread
 import asyncio
 from oauth2client.service_account import ServiceAccountCredentials
-from app import getStandings, getUpcomingGames
+from app import getStandings, getUpcomingGames, get_db_connection
 
 # Setup Discord bot
 intents = discord.Intents.default()
@@ -42,6 +42,44 @@ def findTeamsFromGame(id):
             return game[0], game[1]
         
 
+# check for messages in db for the bot
+async def checkEvents():
+    while True:
+        await asyncio.sleep(10)
+
+        conn = get_db_connection()
+        events = conn.execute("SELECT * FROM events").fetchall()
+
+        teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
+
+        if not events:
+            continue
+        for event in events:
+            if event[0] == "message":
+                guild = bot.guilds[0]
+                for channel in guild.text_channels:
+                    if channel.name == "standings":
+                        await channel.send("new message for admins")
+            elif event[0] in teamNames:
+                captainRole = discord.utils.get(guild.roles, name=f"{event[0]} Captain")
+                guild = bot.guilds[0]
+                for channel in guild.text_channels:
+                    if channel.name == "standings":
+                        await channel.send(f"new request for {captainRole.mention}")
+            else:
+                print(f"Unknown event: {event[0]}")
+        # clear events
+        conn.execute("DELETE FROM events")
+
+        conn.commit()
+        conn.close()
+
+
+
+
+
+
+
 
 
 # NORMAL COMMANDS
@@ -56,8 +94,10 @@ async def help(ctx):
     embed.add_field(name="**ADMIN** !makegame Team1 v Team2", value="Creates a new game between Team1 and Team2", inline=False)
     embed.add_field(name="**CAPTAIN** !setdatetime ID DD-MM-YYYY_HH:MM", value="Sets the date and time for the game with the given id SET ALL TIMES WITH UTC", inline=False)
     embed.add_field(name="**CAPTAIN** !setteam ID PLAYER1, PLAYER2, PLAYER3 etc", value="Sets the team for the game with the given id", inline=False)
+    embed.add_field(name="**CAPTAIN/ADMIN** !result ID Game1 Game2 Game3", value="Sets the result for the game with the given id, where each game is in the format X:Y (e.g. 1:0)", inline=False)
     embed.add_field(name="!standings", value="Shows the current standings", inline=False)
     embed.add_field(name="!games", value="Shows all upcoming games ALL TIMES WILL BE UTC", inline=False)
+    embed.add_field(name="!website", value="Shows the website link", inline=False)
 
     await ctx.send(embed=embed)
 
@@ -86,12 +126,17 @@ async def info(ctx, commandName: str):
         embed.description = "Sets the date and time for the game with the given id **CAPTAIN ONLY**"
         embed.add_field(name="Usage", value="!setdatetime ID DD-MM-YYYY_HH:MM", inline=False)
         embed.add_field(name="Example", value="!setdatetime 1 01-01-2025_12:00", inline=False)
-        embed.set_footer(text="captains should get a DM with the id and all times are UTC")
+        embed.set_footer(text="captains should get a DM with the id and all times are UTC. The other captain or an admin need to confirm the time by reacting to the message with a ✅ or deny with ❌")
     elif commandName == "setteam":
         embed.description = "Sets the team for the game with the given id **CAPTAIN ONLY**"
         embed.add_field(name="Usage", value="!setteam ID PLAYER1, PLAYER2, PLAYER3 etc", inline=False)
         embed.add_field(name="Example", value="!setteam 1 AIMORE, Squirt, Spoon", inline=False)
         embed.set_footer(text="captains should get a DM with the id and player names cannot contain commas (they are used to separate players)")
+    elif commandName == "result":
+        embed.description = "Sets the result for the game with the given id **CAPTAIN OR ADMIN ONLY**"
+        embed.add_field(name="Usage", value="!result ID HomeScore1:AwayScore1 HomeScore2:AwayScore2 HomeScore3:AwayScore3", inline=False)
+        embed.add_field(name="Example", value="!result 1 0:9 5:9 9:8", inline=False)
+        embed.set_footer(text="If a captain uses this command, the other captain needs to confirm the result by reacting to the message with a ✅ or deny with ❌. If an admin uses this command, it will be set without confirmation. The scores must be in home:away order")
     elif commandName == "standings":
         embed.description = "Shows the current standings"
         embed.add_field(name="Usage", value="!standings", inline=False)
@@ -102,6 +147,11 @@ async def info(ctx, commandName: str):
         embed.add_field(name="Usage", value="!games", inline=False)
         embed.add_field(name="Example", value="!games", inline=False)
         embed.set_footer(text="all times are UTC (the website will show the times in your local timezone)")
+    elif commandName == "website":
+        embed.description = "Shows the website link"
+        embed.add_field(name="Usage", value="!website", inline=False)
+        embed.add_field(name="Example", value="!website", inline=False)
+        embed.set_footer(text="the website has more information and you can request membership to teams there")
     else:
         embed.description = "Command not found."
 
@@ -126,6 +176,13 @@ async def games(ctx):
     for game in games:
         embed.add_field(name=f"{game[1]} vs {game[2]}", value=f"Date: {game[3]} | Teams: {game[4]} vs {game[5]}", inline=False)
 
+    await ctx.send(embed=embed)
+
+#website command
+@bot.command()
+async def website(ctx):
+    embed = discord.Embed(title="Website", description="Visit the website for more information and to request membership to teams.", color=discord.Color.blue())
+    embed.add_field(name="Link", value="https://vailminorleague.pythonanywhere.com", inline=False)
     await ctx.send(embed=embed)
 
 
@@ -534,6 +591,9 @@ async def on_ready():
                 print("running")
                 await channel.send(embed=embed)
                 return
+        
+        # check events
+        bot.loop.create_task(checkEvents())
 
 #run bot
 if __name__ == "__main__":

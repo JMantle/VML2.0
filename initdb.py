@@ -194,6 +194,23 @@ def deleteMessage(id):
     connect.commit()
     connect.close()
 
+def resetEvents():
+    connect = sqlite3.connect("database.db")
+    c = connect.cursor()
+
+    c.execute("DROP TABLE IF EXISTS events")
+
+    c.execute("""
+
+        CREATE TABLE events (
+            event TEXT NOT NULL PRIMARY KEY
+        )
+
+    """)
+
+    connect.commit()
+    connect.close()
+
 
 def main():
     loop = True
@@ -251,6 +268,8 @@ def main():
         elif answer == "dm":
             id = input("id: ")
             deleteMessage(id)
+        elif answer == "re":
+            resetEvents()
 
 
 # prevent accidental running

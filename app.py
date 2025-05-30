@@ -291,6 +291,11 @@ def requestMembership(teamName, username):
     #put it in database
     conn = get_db_connection()
     conn.execute("INSERT INTO requests (teamname, username, message) VALUES (?, ?, ?)", (teamName, username, message))
+    
+
+    # enter event into event database for the bot to see
+    conn.execute("INSERT INTO events (event) VALUES (?)", (teamName,))
+
     conn.commit()
     conn.close()
 
@@ -644,6 +649,10 @@ def submitMessage():
     #put in database
     conn = get_db_connection()
     conn.execute("INSERT INTO messages (name, email, message) VALUES (?, ?, ?)", (name, email, message))
+
+    #update events for bot
+    conn.execute("INSERT INTO events (event) VALUES (?)", ("message",))
+
     conn.commit()
     conn.close()
 
