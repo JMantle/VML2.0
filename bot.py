@@ -604,3 +604,6 @@ if __name__ == "__main__":
     print("Starting")
     bot.run(botToken)
 
+def runBot():
+    botToken = os.getenv("botToken")
+    bot.run(botToken)
