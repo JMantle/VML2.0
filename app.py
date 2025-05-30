@@ -6,6 +6,8 @@ import pytz
 from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
+import os
 
 
 
@@ -17,7 +19,8 @@ app.secret_key = "secretKey"   ## ENTER SECRET KEY HERE
 
 # sheets setup
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("keys/key.json", scope)
+key = json.loads(os.getenv("key"))
+creds = ServiceAccountCredentials.from_json_keyfile_dict(key, scope)
 client = gspread.authorize(creds)
 
 # open sheet

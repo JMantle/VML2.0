@@ -4,6 +4,8 @@ import gspread
 import asyncio
 from oauth2client.service_account import ServiceAccountCredentials
 from app import getStandings, getUpcomingGames, get_db_connection
+import json
+import os
 
 # Setup Discord bot
 intents = discord.Intents.default()
@@ -16,7 +18,8 @@ bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
 
 # Setup Google Sheets access
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("keys/key.json", scope)
+key = json.loads(os.getenv("key"))
+creds = ServiceAccountCredentials.from_json_keyfile_dict(key, scope)
 client = gspread.authorize(creds)
 
 # Open the sheet by ID
@@ -597,8 +600,7 @@ async def on_ready():
 
 #run bot
 if __name__ == "__main__":
-    with open("keys/botToken.txt", "r") as tokenFile:
-        botToken = tokenFile.read().strip()
+    botToken = os.getenv("botToken")
     print("Starting")
     bot.run(botToken)
 
