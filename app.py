@@ -8,6 +8,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
+import threading
+import bot
 
 
 
@@ -704,6 +706,10 @@ def root():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000)) 
     app.run(host="0.0.0.0", port=port, debug=True)
+
+    # run bot in thread
+    botThread = threading.Thread(target=bot.runBot())
+    botThread.start()
 
 # entry point
 def runApp():
