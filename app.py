@@ -10,6 +10,7 @@ import json
 import os
 
 global first
+first = True
 
 
 # flask app
@@ -107,6 +108,7 @@ def goToSignUp():
 # handle attempted sign up
 @app.route("/signUpSubmit", methods=["POST"])
 def signUp():
+    global first
     #get username and check it is valid (no commas)
     username = request.form["username"]
     if ',' in username:
@@ -126,11 +128,11 @@ def signUp():
             conn.execute("INSERT INTO logins (username, password) VALUES (?, ?)", (username, hashedPassword))
 
             #check for first user
-            if g.first:
+            if first:
                 #give them admin perms
                 conn.execute("UPDATE logins SET admin = 1 WHERE username = ?", (username,))
                 session["adminperms"] = True
-                g.first = False
+                first = False
             conn.commit()
             conn.close()
             #let user log in
@@ -718,9 +720,6 @@ if __name__ == "__main__":
     resetMessages()
     resetRequests()
     resetEvents()
-
-    if not hasattr(g, "first"):
-        g.first = True
 
     #run app
     port = int(os.environ.get("PORT", 5000)) 
