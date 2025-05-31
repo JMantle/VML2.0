@@ -704,12 +704,16 @@ def root():
 
 #prevent accidental running
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000)) 
-    app.run(host="0.0.0.0", port=port, debug=True)
 
     # run bot in thread
     botThread = threading.Thread(target=bot.runBot())
     botThread.start()
+
+    #run app
+    port = int(os.environ.get("PORT", 5000)) 
+    app.run(host="0.0.0.0", port=port, debug=True)
+
+    
 
 # entry point
 def runApp():
