@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request, flash, session
+from flask import Flask, render_template, redirect, request, flash, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from datetime import datetime
@@ -126,11 +126,11 @@ def signUp():
             conn.execute("INSERT INTO logins (username, password) VALUES (?, ?)", (username, hashedPassword))
 
             #check for first user
-            if first:
+            if g.first:
                 #give them admin perms
                 conn.execute("UPDATE logins SET admin = 1 WHERE username = ?", (username,))
                 session["adminperms"] = True
-                first = False
+                g.first = False
             conn.commit()
             conn.close()
             #let user log in
@@ -707,6 +707,12 @@ def root():
     # LOAD
 
     return render_template("load.html")
+
+
+@app.before_first_request
+def initializeFirst():
+    g.first = True
+
 
 #prevent accidental running
 if __name__ == "__main__":
