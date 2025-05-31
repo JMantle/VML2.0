@@ -705,9 +705,6 @@ def root():
 #prevent accidental running
 if __name__ == "__main__":
 
-    # run bot in thread
-    botThread = threading.Thread(target=bot.runBot())
-    botThread.start()
 
     #run app
     port = int(os.environ.get("PORT", 5000)) 
