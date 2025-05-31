@@ -3,14 +3,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from datetime import datetime
 import pytz
-from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage
+from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage, rse
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
-import threading
-import bot
 
+first = True
 
 
 # flask app
@@ -125,6 +124,13 @@ def signUp():
             #hash password and put all data in database
             hashedPassword = generate_password_hash(request.form["password"])
             conn.execute("INSERT INTO logins (username, password) VALUES (?, ?)", (username, hashedPassword))
+
+            #check for first user
+            if first:
+                #give them admin perms
+                conn.execute("UPDATE logins SET admin = 1 WHERE username = ?", (username,))
+                session["adminperms"] = True
+                first = False
             conn.commit()
             conn.close()
             #let user log in
