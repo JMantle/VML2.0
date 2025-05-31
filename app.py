@@ -709,9 +709,6 @@ def root():
     return render_template("load.html")
 
 
-@app._got_first_request
-def initializeFirst():
-    g.first = True
 
 
 #prevent accidental running
@@ -722,7 +719,8 @@ if __name__ == "__main__":
     resetRequests()
     resetEvents()
 
-    first = True
+    if not hasattr(g, "first"):
+        g.first = True
 
     #run app
     port = int(os.environ.get("PORT", 5000)) 
