@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import json
 import os
 
-first = True
+global first
 
 
 # flask app
@@ -715,6 +715,8 @@ if __name__ == "__main__":
     resetMessages()
     resetRequests()
     resetEvents()
+
+    first = True
 
     #run app
     port = int(os.environ.get("PORT", 5000)) 
