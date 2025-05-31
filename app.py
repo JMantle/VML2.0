@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from datetime import datetime
 import pytz
-from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage, rse
+from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
