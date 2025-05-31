@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 from datetime import datetime
 import pytz
-from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage
+from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage, resetLogins, resetEvents, resetMessages, resetRequests 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
@@ -305,7 +305,7 @@ def requestMembership(teamName, username):
     
 
     # enter event into event database for the bot to see
-    conn.execute("INSERT INTO events (event) VALUES (?)", (teamName,))
+    # conn.execute("INSERT INTO events (event) VALUES (?)", (teamName,))
 
     conn.commit()
     conn.close()
@@ -662,7 +662,7 @@ def submitMessage():
     conn.execute("INSERT INTO messages (name, email, message) VALUES (?, ?, ?)", (name, email, message))
 
     #update events for bot
-    conn.execute("INSERT INTO events (event) VALUES (?)", ("message",))
+    # conn.execute("INSERT INTO events (event) VALUES (?)", ("message",))
 
     conn.commit()
     conn.close()
@@ -711,6 +711,10 @@ def root():
 #prevent accidental running
 if __name__ == "__main__":
 
+    resetLogins()
+    resetMessages()
+    resetRequests()
+    resetEvents()
 
     #run app
     port = int(os.environ.get("PORT", 5000)) 
