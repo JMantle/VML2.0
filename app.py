@@ -709,7 +709,7 @@ def root():
     return render_template("load.html")
 
 
-@app.before_first_request
+@app._got_first_request
 def initializeFirst():
     g.first = True
 
