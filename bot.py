@@ -6,6 +6,16 @@ from oauth2client.service_account import ServiceAccountCredentials
 from app import getStandings, getUpcomingGames, get_db_connection
 import json
 import os
+from flask import Flask
+from threading import Thread
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Vail Minor League Bot is running!"
+
+
 
 # Setup Discord bot
 intents = discord.Intents.default()
@@ -598,12 +608,17 @@ async def on_ready():
         # check events
         bot.loop.create_task(checkEvents())
 
-#run bot
-if __name__ == "__main__":
-    botToken = os.getenv("botToken")
-    print("Starting")
-    bot.run(botToken)
+def runFlask():
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
 
-def runBot():
+# Run bot and Flask app
+if __name__ == "__main__":
+    # Start Flask app in a separate thread
+    flaskThread = Thread(target=runFlask)
+    flaskThread.start()
+
+    # Run Discord bot
     botToken = os.getenv("botToken")
+    print("Starting Discord bot")
     bot.run(botToken)
