@@ -6,14 +6,18 @@ from oauth2client.service_account import ServiceAccountCredentials
 from app import getStandings, getUpcomingGames, get_db_connection
 import json
 import os
-from flask import Flask
-from threading import Thread
+from aiohttp import web
 
-app = Flask(__name__)
+# aiohttp web server
+routes = web.RouteTableDef()
 
-@app.route('/')
-def index():
-    return "Vail Minor League Bot is running!"
+@routes.get("/")
+async def index(request):
+    return web.Response(text="Hello from aiohttp!")
+
+app = web.Application()
+app.add_routes(routes)
+
 
 
 
@@ -608,17 +612,36 @@ async def on_ready():
         # check events
         bot.loop.create_task(checkEvents())
 
-def runFlask():
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+# Async tasks for bot and server
+async def start_web():
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 5000)
+    await site.start()
+    print("Web server running...")
+
+async def main():
+    await asyncio.gather(
+        start_web(),
+        # Run Discord bot
+        runBot()
+    )
+
+async def runBot():
+    botToken = os.getenv("botToken")
+    print("Starting Discord bot")
+    await bot.start(botToken)
 
 # Run bot and Flask app
 if __name__ == "__main__":
-    # Start Flask app in a separate thread
-    flaskThread = Thread(target=runFlask)
-    flaskThread.start()
+    ## Start Flask app in a separate thread
+    #flaskThread = Thread(target=runFlask)
+    #flaskThread.start()
+#
+    ## Run Discord bot
+    #botToken = os.getenv("botToken")
+    #print("Starting Discord bot")
+    #bot.run(botToken)
 
-    # Run Discord bot
-    botToken = os.getenv("botToken")
-    print("Starting Discord bot")
-    bot.run(botToken)
+    # Run everything in one event loop
+    asyncio.run(main())
