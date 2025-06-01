@@ -626,28 +626,18 @@ async def start_web():
     await site.start()
     print("Web server running...")
 
-async def main():
-    await asyncio.gather(
-        start_web(),
-        # Run Discord bot
-        runBot()
-    )
-
 async def runBot():
     botToken = os.getenv("botToken")
     print("Starting Discord bot")
     await bot.start(botToken)
 
-# Run bot and Flask app
-if __name__ == "__main__":
-    ## Start Flask app in a separate thread
-    #flaskThread = Thread(target=runFlask)
-    #flaskThread.start()
-#
-    ## Run Discord bot
-    #botToken = os.getenv("botToken")
-    #print("Starting Discord bot")
-    #bot.run(botToken)
+async def main():
+    # Run both the web server and Discord bot in the same event loop
+    await asyncio.gather(
+        start_web(),
+        runBot()
+    )
 
-    # Run everything in one event loop
+if __name__ == "__main__":
+    # Use asyncio.run() to start the main coroutine
     asyncio.run(main())
