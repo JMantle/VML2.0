@@ -485,9 +485,11 @@ async def result(ctx, id: int, game1: str, game2: str, game3: str):
             await ctx.send(f"Error setting game score for ID {id}.")
         if await moveToFinishedGames(id, game1, game2, game3):
             await ctx.send(f"Game with ID {id} moved to finished games.")
+            await updateStandings()
             return
         else:
             await ctx.send(f"Error moving game with ID {id} to finished games.")
+            await updateStandings()
             return
 
 # set results into sheet and update standings
@@ -592,8 +594,36 @@ async def moveToFinishedGames(id, game1, game2, game3):
 
 
     
+# update standings subroutine
+async def updateStandings():
+    # Get the guild and standings channel
+    if not bot.guilds:
+        print("No guilds found")
+        return
+    guild = bot.guilds[0]
+    standings_channel = None
+    for channel in guild.text_channels:
+        if channel.name == "standings":
+            standings_channel = channel
+            break
+        
+    if not standings_channel:
+        print("Standings channel not found")
+        return
 
-            
+    # Delete all messages in the standings channel
+    async for message in standings_channel.history(limit=None):
+        try:
+            await message.delete()
+        except discord.Forbidden:
+            print(f"Failed to delete message: {message.id}")
+        except discord.HTTPException as e:
+            print(f"HTTPException while deleting message: {e}")
+
+    # Send updated standings
+    embed = formatStandings()
+    await standings_channel.send(embed=embed)
+    print("Updated standings sent")    
 
 
 
