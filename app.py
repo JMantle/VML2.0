@@ -15,7 +15,7 @@ first = True
 
 # flask app
 app = Flask(__name__)
-app.secret_key = "secretKey"   ## ENTER SECRET KEY HERE
+app.secret_key = os.getenv("appKey")   ## ENTER SECRET KEY HERE
 
 
 
