@@ -626,18 +626,13 @@ async def start_web():
     await site.start()
     print("Web server running...")
 
-async def runBot():
-    botToken = os.getenv("botToken")
-    print("Starting Discord bot")
-    await bot.start(botToken)
-
 async def main():
     # Run both the web server and Discord bot in the same event loop
     await asyncio.gather(
         start_web(),
-        runBot()
+        bot.start(os.getenv("botToken"))
     )
 
 if __name__ == "__main__":
-    # Use asyncio.run() to start the main coroutine
-    asyncio.run(main())
+    # Use bot.loop to run the main coroutine
+    bot.loop.run_until_complete(main())
