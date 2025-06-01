@@ -7,6 +7,12 @@ from app import getStandings, getUpcomingGames, get_db_connection
 import json
 import os
 from aiohttp import web
+import sys
+
+# For Unix systems (Linux/macOS):
+if sys.platform != 'win32':
+    asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+
 
 # aiohttp web server
 routes = web.RouteTableDef()
