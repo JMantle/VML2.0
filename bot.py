@@ -205,7 +205,7 @@ async def games(ctx):
 @bot.command()
 async def website(ctx):
     embed = discord.Embed(title="Website", description="Visit the website for more information and to request membership to teams.", color=discord.Color.blue())
-    embed.add_field(name="Link", value="https://vailminorleague.pythonanywhere.com", inline=False)
+    embed.add_field(name="Link", value="https://vml-srn6.onrender.com", inline=False)
     await ctx.send(embed=embed)
 
 
