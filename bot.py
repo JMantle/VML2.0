@@ -52,7 +52,7 @@ def formatStandings():
     count = 0
     for team in standings:
         count += 1
-        embed.add_field(name=f"{count} **{team[0]}**", value=f"{team[1]} Points| {team[2]} Map wins | {team[3]} Match wins | {team[4]} MMR", inline=False)
+        embed.add_field(name=f"{count} | **{team[0]}**", value=f"{team[1]} Points| {team[2]} Map wins | {team[3]} Match wins | {team[4]} MMR", inline=False)
     return embed
 
 # find teams from game id
@@ -79,6 +79,7 @@ async def checkEvents():
             continue
         for event in events:
             if event[0] == "message":
+                print("message")
                 guild = bot.guilds[0]
                 for channel in guild.text_channels:
                     if channel.name == "standings":
