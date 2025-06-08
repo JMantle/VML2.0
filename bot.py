@@ -81,31 +81,35 @@ async def checkEvents():
             teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
 
             if not events:
-                continue
-            for event in events:
-                if event["event"] == "message":
-                    print("message")
-                    guild = bot.guilds[0]
-                    for channel in guild.text_channels:
-                        if channel.name == "standings":
-                            await channel.send("New message for admins")
-                elif event["event"] in teamNames:
-                    guild = bot.guilds[0]
-                    captainRole = discord.utils.get(guild.roles, name=f"{event['event']} Captain")
-                    for channel in guild.text_channels:
-                        if channel.name == "standings":
-                            await channel.send(f"New request for {captainRole.mention}")
-                else:
-                    print(f"Unknown event: {event['event']}")
+                print("No events found")
+            else:
+                for event in events:
+                    if event["event"] == "message":
+                        print("message")
+                        guild = bot.guilds[0]
+                        for channel in guild.text_channels:
+                            if channel.name == "standings":
+                                await channel.send("New message for admins")
+                    elif event["event"] in teamNames:
+                        guild = bot.guilds[0]
+                        captainRole = discord.utils.get(guild.roles, name=f"{event['event']} Captain")
+                        for channel in guild.text_channels:
+                            if channel.name == "standings":
+                                await channel.send(f"New request for {captainRole.mention}")
+                    else:
+                        print(f"Unknown event: {event['event']}")
 
-            cursor.execute("DELETE FROM events")
-            conn.commit()
+                cursor.execute("DELETE FROM events")
+                conn.commit()
 
         except:
-            print("no events")
+            print("error")
         finally:
-            cursor.close()
-            conn.close()
+            try:
+                cursor.close()
+                conn.close()
+            except:
+                print("Failed to close cursor or connection")   
 
 
 
@@ -651,7 +655,7 @@ async def on_ready():
         for channel in guild.text_channels:
             if channel.name == "standings":
                 print("running")
-                updateStandings()
+                await updateStandings()
                 return
         
         
