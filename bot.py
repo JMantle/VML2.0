@@ -647,8 +647,7 @@ async def on_ready():
                 await channel.send(embed=embed)
                 return
         
-        # check events
-        bot.loop.create_task(checkEvents())
+        
 
 # Async tasks for bot and server
 async def start_web():
@@ -659,6 +658,9 @@ async def start_web():
     print("Web server running...")
 
 async def main():
+    # check events
+    bot.loop.create_task(checkEvents())
+
     # Run both the web server and Discord bot in the same event loop
     await asyncio.gather(
         start_web(),
