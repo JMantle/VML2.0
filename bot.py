@@ -76,6 +76,8 @@ async def checkEvents():
             cursor.execute("SELECT * FROM events")
             events = cursor.fetchall()
 
+            print(events)
+
             teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
 
             if not events:
@@ -648,9 +650,8 @@ async def on_ready():
         guild = bot.guilds[0]
         for channel in guild.text_channels:
             if channel.name == "standings":
-                embed = formatStandings()
                 print("running")
-                await channel.send(embed=embed)
+                updateStandings()
                 return
         
         
