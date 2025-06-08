@@ -4,3 +4,4 @@ py-cord
 gspread
 oauth2client
 aiohttp
+mysql-connector-python
