@@ -71,19 +71,10 @@ async def checkEvents():
     while True:
         await asyncio.sleep(10)
 
-        guild = bot.guilds[0]
-        for channel in guild.text_channels:
-            if channel.name == "standings":
-                await channel.send("new events?")
         try:
             cursor, conn = get_db_connection(dictionary=True)
             cursor.execute("SELECT * FROM events")
             events = cursor.fetchall()
-
-            guild = bot.guilds[0]
-            for channel in guild.text_channels:
-                if channel.name == "standings":
-                    await channel.send(events)
 
             teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
 
