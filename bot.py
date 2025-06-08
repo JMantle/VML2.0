@@ -8,6 +8,7 @@ import json
 import os
 from aiohttp import web
 import sys
+import mysql.connector
 
 # For Unix systems (Linux/macOS):
 if sys.platform != 'win32':
@@ -70,34 +71,39 @@ async def checkEvents():
     while True:
         await asyncio.sleep(10)
 
-        cursor, conn = get_db_connection()
-        events = cursor.execute("SELECT * FROM events").fetchall()
+        try:
+            cursor, conn = get_db_connection(dictionary=True)
+            cursor.execute("SELECT * FROM events")
+            events = cursor.fetchall()
 
-        teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
+            teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
 
-        if not events:
-            continue
-        for event in events:
-            if event[0] == "message":
-                print("message")
-                guild = bot.guilds[0]
-                for channel in guild.text_channels:
-                    if channel.name == "standings":
-                        await channel.send("new message for admins")
-            elif event[0] in teamNames:
-                captainRole = discord.utils.get(guild.roles, name=f"{event[0]} Captain")
-                guild = bot.guilds[0]
-                for channel in guild.text_channels:
-                    if channel.name == "standings":
-                        await channel.send(f"new request for {captainRole.mention}")
-            else:
-                print(f"Unknown event: {event[0]}")
-        # clear events
-        conn.execute("DELETE FROM events")
+            if not events:
+                continue
+            for event in events:
+                if event["event"] == "message":
+                    print("message")
+                    guild = bot.guilds[0]
+                    for channel in guild.text_channels:
+                        if channel.name == "standings":
+                            await channel.send("New message for admins")
+                elif event["event"] in teamNames:
+                    guild = bot.guilds[0]
+                    captainRole = discord.utils.get(guild.roles, name=f"{event['event']} Captain")
+                    for channel in guild.text_channels:
+                        if channel.name == "standings":
+                            await channel.send(f"New request for {captainRole.mention}")
+                else:
+                    print(f"Unknown event: {event['event']}")
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+            cursor.execute("DELETE FROM events")
+            conn.commit()
+
+        except:
+            print("no events")
+        finally:
+            cursor.close()
+            conn.close()
 
 
 
