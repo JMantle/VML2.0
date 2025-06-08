@@ -1,6 +1,6 @@
 from flask import Flask, render_template, redirect, request, flash, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
+import mysql.connector
 from datetime import datetime
 import pytz
 from initdb import makeTeam, deleteTeam, makeGame, deleteGame, deleteRequest, deleteMessage, resetLogins, resetEvents, resetMessages, resetRequests 
@@ -50,10 +50,19 @@ def sortTeams():
 
 
 # get database connection and format
-def get_db_connection():
-    conn = sqlite3.connect("database.db")
-    conn.row_factory = sqlite3.Row
-    return conn 
+def get_db_connection(dictionary=False):
+    conn = mysql.connector.connect(
+        host=os.getenv('DB_HOST'),
+        port=int(os.getenv('DB_PORT')),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        database=os.getenv('DB_NAME'),
+        ssl_ca=os.getenv('DB_CA_PATH'),
+        ssl_verify_cert=True
+    )
+    if dictionary:
+        return conn.cursor(dictionary=True), conn
+    return conn.cursor(), conn 
 
 
 
@@ -66,12 +75,14 @@ def inputSubmitted():
     username = request.form["username"]
     attemptedPassword = request.form["password"]
     #search to see if account exists
-    conn = get_db_connection()
-    found = conn.execute("SELECT password FROM logins WHERE username = ?", (username,)).fetchone()
+    cursor, conn = get_db_connection(dictionary=True)
+    cursor.execute("SELECT password FROM logins WHERE username = %s", (username,))
+    found = cursor.fetchone()
+    cursor.close()
     conn.close()
     if found:
         #check password against one stored
-        if check_password_hash(found[0], attemptedPassword):
+        if check_password_hash(found["password"], attemptedPassword):
             #set session variables
             session["loggedIn"] = True
             session["username"] = username
@@ -93,11 +104,13 @@ def inputSubmitted():
 # check account perms
 def checkPerms(username):
     #get users permissions from database
-    conn = get_db_connection()
-    (captain, admin) = conn.execute("SELECT captain, admin FROM logins WHERE username = ?", (username,)).fetchone()
+    cursor, conn = get_db_connection(dictionary=True)
+    cursor.execute("SELECT captain, admin FROM logins WHERE username = %s", (username,))
+    result = cursor.fetchone()
+    cursor.close()
     conn.close()
     #cast them to bool
-    return bool(captain), bool(admin)
+    return bool(result["captain"]), bool(result["admin"])
 
 
 # send user to sign up page
@@ -115,25 +128,28 @@ def signUp():
         flash('Username cannot contain commas.')
         return redirect('/signUpPage')
     else:
-        #make sure username noot taken
-        conn = get_db_connection()
-        found = conn.execute("SELECT password FROM logins WHERE username = ?", (username,)).fetchone()
+        #make sure username not taken
+        cursor, conn = get_db_connection(dictionary=True)
+        cursor.execute("SELECT password FROM logins WHERE username = %s", (username,))
+        found = cursor.fetchone()
         if found:
+           cursor.close()
            conn.close()
            flash("Username already taken")
            return render_template("/signUpPage.html")
         else:
             #hash password and put all data in database
             hashedPassword = generate_password_hash(request.form["password"])
-            conn.execute("INSERT INTO logins (username, password) VALUES (?, ?)", (username, hashedPassword))
+            cursor.execute("INSERT INTO logins (username, password) VALUES (%s, %s)", (username, hashedPassword))
 
             #check for first user
             if first:
                 #give them admin perms
-                conn.execute("UPDATE logins SET admin = 1 WHERE username = ?", (username,))
+                cursor.execute("UPDATE logins SET admin = 1 WHERE username = %s", (username,))
                 session["adminperms"] = True
                 first = False
             conn.commit()
+            cursor.close()
             conn.close()
             #let user log in
             return redirect("/loginPage")
@@ -275,23 +291,27 @@ def team(teamName):
     games = getTimezonedGames(teamName)
 
     #get database connection
-    conn = get_db_connection()
+    cursor, conn = get_db_connection(dictionary=True)
 
     #get membership requests for captain if the user is the captain
     if session.get("loggedIn") and stats["captain"] == session["username"]:
-        requests = conn.execute("SELECT * FROM requests WHERE teamname = ?", (stats["name"],)).fetchall()
+        cursor.execute("SELECT * FROM requests WHERE teamname = %s", (stats["name"],))
+        requests = cursor.fetchall()
+        cursor.close()
         conn.close()
         return render_template("team.html", stats=stats, games=games, captain=True, member=True, requests=requests)
     else:
         #take team members
         members = stats["members"] if stats["members"] is not None else ""
         #get if the user has already requested membership 
-        requested = bool(conn.execute("SELECT 1 FROM requests WHERE username = ? AND teamname = ?", (session["username"], stats["name"])).fetchone())
+        cursor.execute("SELECT 1 FROM requests WHERE username = %s AND teamname = %s", (session["username"], stats["name"]))
+        requested = bool(cursor.fetchone())
         #decide whether to show the request membership button or not.
         if (session["loggedIn"] and session["username"] in members) or  requested:
             member = True
         else:
             member = False
+        cursor.close()
         conn.close()
 
         return render_template("team.html", stats=stats, games=games, captain=False, member=member)
@@ -302,14 +322,15 @@ def requestMembership(teamName, username):
     #get message
     message = request.form.get("message")
     #put it in database
-    conn = get_db_connection()
-    conn.execute("INSERT INTO requests (teamname, username, message) VALUES (?, ?, ?)", (teamName, username, message))
+    cursor, conn = get_db_connection()
+    cursor.execute("INSERT INTO requests (teamname, username, message) VALUES (%s, %s, %s)", (teamName, username, message))
     
 
     # enter event into event database for the bot to see
-    # conn.execute("INSERT INTO events (event) VALUES (?)", (teamName,))
+    cursor.execute("INSERT INTO events (event) VALUES (%s)", (teamName,))
 
     conn.commit()
+    cursor.close()
     conn.close()
 
     return redirect("/showTeam/" + teamName)
@@ -405,18 +426,20 @@ def addMember(teamName):
 #def assignPlayers(gameId, teamName):
 #    #get data
 #    players = request.form.get("players").strip()
-#    conn = get_db_connection()
+#    cursor, conn = get_db_connection()
 #
 #    #figure out whether team is home or away
-#    side = conn.execute("SELECT home FROM games WHERE id = ?", (gameId,)).fetchone()
+#    cursor.execute("SELECT home FROM games WHERE id = %s", (gameId,))
+#    side = cursor.fetchone()
 #    if side[0] == teamName:
 #        #home team
-#        conn.execute("UPDATE games SET homeplayers = ? WHERE id = ?", (players, gameId))
+#        cursor.execute("UPDATE games SET homeplayers = %s WHERE id = %s", (players, gameId))
 #    else:
 #        #away team
-#        conn.execute("UPDATE games SET awayplayers = ? WHERE id = ?", (players, gameId))
+#        cursor.execute("UPDATE games SET awayplayers = %s WHERE id = %s", (players, gameId))
 #
 #    conn.commit()
+#    cursor.close()
 #    conn.close()
 #
 #    #return to manage team
@@ -425,10 +448,11 @@ def addMember(teamName):
 #handle accepting membership requests
 @app.route("/acceptRequest/<int:id>", methods=["POST"])
 def acceptRequest(id):
-    conn = get_db_connection()
+    cursor, conn = get_db_connection(dictionary=True)
 
     #get request
-    request = conn.execute("SELECT * FROM requests WHERE id = ?", (id,)).fetchone()
+    cursor.execute("SELECT * FROM requests WHERE id = %s", (id,))
+    request = cursor.fetchone()
     teamName = request["teamname"]
     name = request["username"]
 
@@ -451,6 +475,9 @@ def acceptRequest(id):
     #delete request
     deleteRequest(id)
 
+    cursor.close()
+    conn.close()
+
     return redirect("/manageTeam")
 
 #handle declining request
@@ -470,8 +497,10 @@ def admin():
     games = getTimezonedGames("")
     users = getUsers()
     #get messages
-    conn = get_db_connection()
-    messages = conn.execute("SELECT * FROM messages").fetchall()
+    cursor, conn = get_db_connection(dictionary=True)
+    cursor.execute("SELECT * FROM messages")
+    messages = cursor.fetchall()
+    cursor.close()
     conn.close()
     #load page
     return render_template("admin.html", teams=teams, games=games, users=users, messages=messages) 
@@ -480,29 +509,34 @@ def admin():
 
 #get all users
 def getUsers():
-    conn = get_db_connection()
-    users = conn.execute("SELECT * FROM logins").fetchall()
+    cursor, conn = get_db_connection(dictionary=True)
+    cursor.execute("SELECT * FROM logins")
+    users = cursor.fetchall()
+    cursor.close()
     conn.close()
     return users
 
 #handle updating user permissions
 @app.route("/updateUser/<string:id>", methods=["POST"])
 def updateUser(id):
-    conn = get_db_connection()
+    cursor, conn = get_db_connection(dictionary=True)
 
     #invert user's captaincy
     if "makeCaptain" in request.form:
-        row = conn.execute("SELECT captain FROM logins WHERE id = ?", (id,)).fetchone()
+        cursor.execute("SELECT captain FROM logins WHERE id = %s", (id,))
+        row = cursor.fetchone()
         current = row["captain"]
-        conn.execute("UPDATE logins SET captain = ? WHERE id = ?", (0 if current else 1, id))
+        cursor.execute("UPDATE logins SET captain = %s WHERE id = %s", (0 if current else 1, id))
 
     #invert user's admin permission
     elif "makeAdmin" in request.form:
-        row = conn.execute("SELECT admin FROM logins WHERE id = ?", (id,)).fetchone()
+        cursor.execute("SELECT admin FROM logins WHERE id = %s", (id,))
+        row = cursor.fetchone()
         current = row["admin"]
-        conn.execute("UPDATE logins SET admin = ? WHERE id = ?", (0 if current else 1, id))
+        cursor.execute("UPDATE logins SET admin = %s WHERE id = %s", (0 if current else 1, id))
 
     conn.commit()
+    cursor.close()
     conn.close()
     return redirect("/admin")
 
@@ -511,7 +545,7 @@ def updateUser(id):
 ##handle updating team data                                    (might be needed idk yet)
 #@app.route("/updateTeam/<int:id>", methods=["POST"])
 #def updateTeam(id):
-#    conn = get_db_connection()
+#    cursor, conn = get_db_connection()
 #
 #    #get inputted data
 #    name = request.form.get("name").strip()
@@ -523,7 +557,8 @@ def updateUser(id):
 #    mmr = request.form.get("mmr").strip()
 #
 #    #get previous data
-#    team = conn.execute("SELECT * FROM teams WHERE id = ?", (id,)).fetchone()
+#    cursor.execute("SELECT * FROM teams WHERE id = %s", (id,))
+#    team = cursor.fetchone()
 #
 #    #update data if inputted, otherwise result to previous data
 #    updatedName = name if name else team['name']
@@ -535,9 +570,10 @@ def updateUser(id):
 #    updatedmmr = mmr if mmr else team["mmr"]
 #
 #    #return to database
-#    conn.execute("UPDATE teams SET name = ?, mapwins = ?, matchwins = ?, captain = ?, members = ?, points = ?, mmr = ? WHERE id = ?", (updatedName, updatedMapWins, updatedMatchWins, updatedCaptain, updatedMembers, updatedPoints, updatedmmr, id))
+#    cursor.execute("UPDATE teams SET name = %s, mapwins = %s, matchwins = %s, captain = %s, members = %s, points = %s, mmr = %s WHERE id = %s", (updatedName, updatedMapWins, updatedMatchWins, updatedCaptain, updatedMembers, updatedPoints, updatedmmr, id))
 #
 #    conn.commit()
+#    cursor.close()
 #    conn.close()
 #
 #    #update their places (mmr could be changed affecting the order of the teams)
@@ -577,7 +613,7 @@ def updateUser(id):
 ##handle updating game
 #@app.route("/updateGame/<int:id>", methods=["POST"])
 #def updateGame(id):
-#    conn = get_db_connection()
+#    cursor, conn = get_db_connection()
 #
 #    #get data
 #    home = request.form.get("home").strip()
@@ -588,7 +624,8 @@ def updateUser(id):
 #    other = request.form.get("other").strip()
 #    
 #    #get previous data
-#    game = conn.execute("SELECT * FROM games WHERE id = ?", (id,)).fetchone()
+#    cursor.execute("SELECT * FROM games WHERE id = %s", (id,))
+#    game = cursor.fetchone()
 #
 #    #update data if there is new data, otherwise use previous data
 #    updatedHome = home if home else game['home']
@@ -599,9 +636,10 @@ def updateUser(id):
 #    updatedOther = other if other else game['other']
 #
 #    #put it back in database
-#    conn.execute("UPDATE games SET home = ?, away = ?, datetime = ?, homeplayers = ?, awayplayers = ?, other = ? WHERE id = ?", (updatedHome, updatedAway, updatedDatetime, updatedHomePlayers, updatedAwayPlayers, updatedOther, id))
+#    cursor.execute("UPDATE games SET home = %s, away = %s, datetime = %s, homeplayers = %s, awayplayers = %s, other = %s WHERE id = %s", (updatedHome, updatedAway, updatedDatetime, updatedHomePlayers, updatedAwayPlayers, updatedOther, id))
 #
 #    conn.commit()
+#    cursor.close()
 #    conn.close()
 #
 #    return redirect("/admin")
@@ -660,13 +698,14 @@ def submitMessage():
     message = request.form.get("message").strip()
 
     #put in database
-    conn = get_db_connection()
-    conn.execute("INSERT INTO messages (name, email, message) VALUES (?, ?, ?)", (name, email, message))
+    cursor, conn = get_db_connection()
+    cursor.execute("INSERT INTO messages (name, email, message) VALUES (%s, %s, %s)", (name, email, message))
 
     #update events for bot
-    # conn.execute("INSERT INTO events (event) VALUES (?)", ("message",))
+    cursor.execute("INSERT INTO events (event) VALUES (%s)", ("message",))
 
     conn.commit()
+    cursor.close()
     conn.close()
 
     #handle user

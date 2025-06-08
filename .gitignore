@@ -23,3 +23,6 @@ Pipfile.lock
 
 # ignore keys
 /keys
+
+# ignore certificates
+ca.pem

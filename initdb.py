@@ -1,215 +1,212 @@
-import sqlite3
+import mysql.connector
+import os
+
+# Get database connection
+def get_db_connection():
+    conn = mysql.connector.connect(
+        host=os.getenv('DB_HOST'),
+        port=int(os.getenv('DB_PORT')),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        database=os.getenv('DB_NAME'),
+        ssl_ca=os.getenv('DB_CA_PATH'),
+        ssl_verify_cert=True
+    )
+    return conn
+
 
 def resetLogins():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("""
-
-        DROP TABLE IF EXISTS logins
-
-    """)
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS logins")
+    cursor.execute("""
         CREATE TABLE logins (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL,
-            password TEXT NOT NULL,
-            email TEXT,
-            team TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(255) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            email VARCHAR(255),
+            team VARCHAR(255),
             captain BOOLEAN DEFAULT 0,
             admin BOOLEAN DEFAULT 0
         )
-
     """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    connect.commit()
-    connect.close()
 
 def resetTeams():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("""
-
-        DROP TABLE IF EXISTS teams
-
-    """)
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS teams")
+    cursor.execute("""
         CREATE TABLE teams (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
             place INT,
             mapwins INT,
             matchwins INT,
-            captain TEXT,
+            captain VARCHAR(255),
             members TEXT,
             points INT,
             mmr INT
         )
-
     """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    connect.commit()
-    connect.close()
 
-def makeTeam(name, mapwins, matchwins, captain, points, mmr):  # feels OO to me but i dont think making it OO will help
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
+def makeTeam(name, mapwins, matchwins, captain, points, mmr):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO teams (name, mapwins, matchwins, captain, points, mmr) VALUES (%s, %s, %s, %s, %s, %s)", 
+                   (name, mapwins, matchwins, captain, points, mmr))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    c.execute("INSERT INTO teams (name, mapwins, matchwins, captain, points, mmr) VALUES (?, ?, ?, ?, ?, ?)", (name, mapwins, matchwins, captain, points, mmr))
-
-    connect.commit()
-    connect.close()
 
 def deleteTeam(id):
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM teams WHERE id = %s", (id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    c.execute("DELETE FROM teams WHERE id = ?", (id,))
-
-    connect.commit()
-    connect.close()
 
 def resetGames():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("DROP TABLE IF EXISTS games")
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS games")
+    cursor.execute("""
         CREATE TABLE games (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            home TEXT NOT NULL,
-            away TEXT NOT NULL,
-            winner TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            home VARCHAR(255) NOT NULL,
+            away VARCHAR(255) NOT NULL,
+            winner VARCHAR(255),
             datetime DATETIME,
             homeplayers TEXT,
             awayplayers TEXT,
             other TEXT
         )
-
     """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    connect.commit()
-    connect.close()
 
 def makeGame(home, away, datetime):
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-    c.execute("INSERT INTO games (home, away, datetime) VALUES (?, ?, ?)", (home, away, datetime))  
-    connect.commit()
-    connect.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO games (home, away, datetime) VALUES (%s, %s, %s)", (home, away, datetime))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 
 def deleteGame(id):
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("DELETE FROM games WHERE id = ?", (id,))
-
-    connect.commit()
-    connect.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM games WHERE id = %s", (id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 def editGame(attribute, value, id):
-    connect = sqlite3.connect("database.db")
-    c= connect.cursor()
-    c.execute(f"UPDATE games SET {attribute} = ? WHERE id = ?", (value, id))
-    connect.commit()
-    connect.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"UPDATE games SET {attribute} = %s WHERE id = %s", (value, id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 
 def editPerms(username, captain, admin):
-    connect = sqlite3.connect("database.db")
-    c= connect.cursor()
-    c.execute("UPDATE logins SET captain = ?, admin = ? WHERE username = ?", (captain, admin, username))
-    connect.commit()
-    connect.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE logins SET captain = %s, admin = %s WHERE username = %s", (captain, admin, username))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
 
 def getPerms(username):
-    connect = sqlite3.connect("database.db")
-    c= connect.cursor()
-    (captain, admin) = c.execute("SELECT captain, admin FROM logins WHERE username = ?", (username,)).fetchone()
-    connect.close()
-    return captain, admin
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT captain, admin FROM logins WHERE username = %s", (username,))
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return result["captain"], result["admin"]
+
 
 def resetRequests():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("DROP TABLE IF EXISTS requests")
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS requests")
+    cursor.execute("""
         CREATE TABLE requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            teamname TEXT NOT NULL,
-            username TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            teamname VARCHAR(255) NOT NULL,
+            username VARCHAR(255),
             message TEXT
         )
-
     """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    connect.commit()
-    connect.close()
 
 def deleteRequest(id):
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM requests WHERE id = %s", (id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    c.execute("DELETE FROM requests WHERE id = ?", (id,))
-
-    connect.commit()
-    connect.close()
 
 def resetMessages():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("DROP TABLE IF EXISTS messages")
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS messages")
+    cursor.execute("""
         CREATE TABLE messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255),
+            email VARCHAR(255),
             message TEXT
         )
-
     """)
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    connect.commit()
-    connect.close()
 
 def deleteMessage(id):
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM messages WHERE id = %s", (id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
 
-    c.execute("DELETE FROM messages WHERE id = ?", (id,))
-
-    connect.commit()
-    connect.close()
 
 def resetEvents():
-    connect = sqlite3.connect("database.db")
-    c = connect.cursor()
-
-    c.execute("DROP TABLE IF EXISTS events")
-
-    c.execute("""
-
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS events")
+    cursor.execute("""
         CREATE TABLE events (
-            event TEXT NOT NULL PRIMARY KEY
+            event VARCHAR(255) NOT NULL PRIMARY KEY
         )
-
     """)
-
-    connect.commit()
-    connect.close()
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 def main():
@@ -224,54 +221,54 @@ def main():
             resetTeams()
         elif answer == "mt":
             name = input("Name: ")
-            place = int(input("Place: "))
-            games = int(input("Games: "))
-            wins = int(input("Wins: "))
+            mapwins = int(input("Map Wins: "))
+            matchwins = int(input("Match Wins: "))
             captain = input("Captain: ")
             points = int(input("Points: "))
-            makeTeam(name, place, games, wins, captain, points)
+            mmr = int(input("MMR: "))
+            makeTeam(name, mapwins, matchwins, captain, points, mmr)
         elif answer == "dt":
-            id = input("id of team to delete: ")
+            id = input("ID of team to delete: ")
             deleteTeam(id)
         elif answer == "rg":
             resetGames()
         elif answer == "eg":
-            id = input("Id: ")
-            attribute = input("attribute: ")
-            value = input("value: ")
+            id = input("ID: ")
+            attribute = input("Attribute: ")
+            value = input("Value: ")
             editGame(attribute, value, id)
         elif answer == "mg":
-            home = input("home: ")
-            away = input("away: ")
-            datetime = input("datetime: ")
+            home = input("Home: ")
+            away = input("Away: ")
+            datetime = input("Datetime: ")
             makeGame(home, away, datetime)
         elif answer == "lp":
-            username = input("username: ")
-            captain = input("captain: ")
-            admin = input("admin: ")
+            username = input("Username: ")
+            captain = input("Captain: ")
+            admin = input("Admin: ")
             editPerms(username, captain, admin)
         elif answer == "gp":
-            username = input("username: ")
-            (captain, admin) = getPerms(username)
-            print("captain: ", captain)
-            print("admin: ", admin)
+            username = input("Username: ")
+            captain, admin = getPerms(username)
+            print("Captain: ", captain)
+            print("Admin: ", admin)
         elif answer == "dg":
-            id = input("id: ")
+            id = input("ID: ")
             deleteGame(id)
         elif answer == "rr":
             resetRequests()
         elif answer == "dr":
-            id = input("id: ")
+            id = input("ID: ")
             deleteRequest(id)
         elif answer == "rm":
             resetMessages()
         elif answer == "dm":
-            id = input("id: ")
+            id = input("ID: ")
             deleteMessage(id)
         elif answer == "re":
             resetEvents()
 
 
-# prevent accidental running
+# Prevent accidental running
 if __name__ == "__main__":
     main()

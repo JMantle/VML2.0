@@ -70,8 +70,8 @@ async def checkEvents():
     while True:
         await asyncio.sleep(10)
 
-        conn = get_db_connection()
-        events = conn.execute("SELECT * FROM events").fetchall()
+        cursor, conn = get_db_connection()
+        events = cursor.execute("SELECT * FROM events").fetchall()
 
         teamNames = ["Apex", "Sneaky Snakes", "TFO", "Galaxy Guardians", "Xenon", "741"]
 
@@ -95,6 +95,7 @@ async def checkEvents():
         conn.execute("DELETE FROM events")
 
         conn.commit()
+        cursor.close()
         conn.close()
 
 

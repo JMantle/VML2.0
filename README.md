@@ -12,7 +12,7 @@ discord
 
 gspread
 
-SQLite
+MySQL
 
 HTML/CSS (Jinja templates)
 
