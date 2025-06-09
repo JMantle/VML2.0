@@ -215,6 +215,10 @@ def getTimezonedGames(team):
     games_data = getUpcomingGames(team)
     user_timezone_str = session.get('timezone') 
 
+    #check for games
+    if not games_data:
+        return []
+    
     #format datetimes to normalize
     for game in games_data:
         if game[2] != "-":
